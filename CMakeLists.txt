@@ -1,0 +1,141 @@
+cmake_minimum_required(VERSION 3.16...3.25)
+
+find_package(CEF REQUIRED)
+find_qt(COMPONENTS Widgets)
+
+include(FindGRPC.cmake)
+
+## -- Grpc between plugin and proxy
+
+# Proto file
+get_filename_component(papi_proto "sl_browser_api.proto" ABSOLUTE)
+get_filename_component(papi_proto_path "${papi_proto}" PATH)
+
+# Generated sources
+set(papi_proto_srcs "${CMAKE_CURRENT_BINARY_DIR}/sl_browser_api.pb.cc")
+set(papi_proto_hdrs "${CMAKE_CURRENT_BINARY_DIR}/sl_browser_api.pb.h")
+set(papi_grpc_srcs "${CMAKE_CURRENT_BINARY_DIR}/sl_browser_api.grpc.pb.cc")
+set(papi_grpc_hdrs "${CMAKE_CURRENT_BINARY_DIR}/sl_browser_api.grpc.pb.h")
+
+add_custom_command(
+      OUTPUT "${papi_proto_srcs}" "${papi_proto_hdrs}" "${papi_grpc_srcs}" "${papi_grpc_hdrs}"
+      COMMAND ${_PROTOBUF_PROTOC}
+      ARGS --grpc_out "${CMAKE_CURRENT_BINARY_DIR}"
+	--cpp_out "${CMAKE_CURRENT_BINARY_DIR}"
+	-I "${papi_proto_path}"
+	--plugin=protoc-gen-grpc="${_GRPC_CPP_PLUGIN_EXECUTABLE}"
+	"${papi_proto}"
+      DEPENDS "${papi_proto}")
+
+include_directories("${CMAKE_CURRENT_BINARY_DIR}")
+
+# papi_grpc_proto
+add_library(papi_grpc_proto
+    ${papi_grpc_srcs}
+    ${papi_grpc_hdrs}
+    ${papi_proto_srcs}
+    ${papi_proto_hdrs})
+target_link_libraries(papi_grpc_proto
+    ${_REFLECTION}
+    ${_GRPC_GRPCPP}
+    ${_PROTOBUF_LIBPROTOBUF})
+
+## -- Browser Proxy Process
+
+add_executable(sl-browser WIN32)
+
+target_compile_options(sl-browser PRIVATE $<IF:$<CONFIG:DEBUG>,/MTd,/MT>)
+target_link_options(sl-browser PRIVATE /NODEFAULTLIB:msvcrt)
+
+set_target_properties(sl-browser PROPERTIES LINK_FLAGS_DEBUG "/NODEFAULTLIB:msvcrtd.lib")
+
+if (CMAKE_BUILD_TYPE MATCHES Debug)
+  target_link_options(sl-browser PRIVATE /NODEFAULTLIB:msvcrtd.lib)
+endif()
+
+target_sources(
+  sl-browser
+  PRIVATE main.cpp
+          browser-app.cpp
+          browser-app.hpp
+          browser-client.cpp
+          browser-client.hpp
+          browser-scheme.cpp
+          browser-scheme.hpp
+          browser-version.h
+          cef-headers.hpp
+          deps/json11/json11.cpp
+          deps/json11/json11.hpp
+          deps/base64/base64.cpp
+          deps/base64/base64.hpp
+          deps/signal-restore.cpp
+          deps/signal-restore.hpp
+		      ${papi_proto_srcs}
+		      ${papi_grpc_srcs})
+          
+target_include_directories(sl-browser PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/deps")
+
+target_compile_features(sl-browser PRIVATE cxx_std_17)
+
+target_link_libraries(sl-browser PRIVATE CEF::Wrapper CEF::Library d3d11 dxgi)
+target_link_libraries(sl-browser PRIVATE Qt::Widgets)
+target_link_libraries(sl-browser PRIVATE Qt::Core)
+target_link_libraries(sl-browser PRIVATE Qt::Gui)
+target_link_libraries(sl-browser PRIVATE 
+	  papi_grpc_proto
+	  ${_REFLECTION}
+	  ${_GRPC_GRPCPP}
+	  ${_PROTOBUF_LIBPROTOBUF})
+
+target_link_options(sl-browser PRIVATE /IGNORE:4099)
+
+## -- Plugin loaded by obs
+
+add_library(sl-browser-plugin MODULE)
+
+target_sources(
+  sl-browser-plugin
+  PRIVATE sl-browser-plugin.cpp
+    ${papi_proto_srcs}
+    ${papi_grpc_srcs})
+
+target_include_directories(sl-browser-plugin PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/deps")
+
+target_compile_features(sl-browser-plugin PRIVATE cxx_std_17)
+target_link_libraries(sl-browser-plugin PRIVATE OBS::libobs OBS::frontend-api)
+
+target_link_libraries(obs-vst
+  ${_REFLECTION}
+  ${_GRPC_GRPCPP}
+  ${_PROTOBUF_LIBPROTOBUF}
+
+setup_plugin_target(sl-browser-plugin)
+
+## -- Helper proxy children
+
+add_executable(sl-browser-page)
+
+target_sources(sl-browser-page PRIVATE cef-headers.hpp sl-browser-page/sl-browser-page-main.cpp browser-app.cpp
+                                        browser-app.hpp deps/json11/json11.cpp deps/json11/json11.hpp)
+
+target_link_libraries(sl-browser-page PRIVATE CEF::Library)
+
+target_include_directories(sl-browser-page PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/deps
+                                                    ${CMAKE_CURRENT_SOURCE_DIR}/sl-browser-page)
+                                                    
+target_sources(sl-browser-page PRIVATE sl-browser-page.manifest)
+
+target_compile_features(sl-browser-page PRIVATE cxx_std_17)
+
+if(TARGET CEF::Wrapper_Debug)
+  target_link_libraries(sl-browser-page PRIVATE optimized CEF::Wrapper)
+  target_link_libraries(sl-browser-page PRIVATE debug CEF::Wrapper_Debug)
+else()
+  target_link_libraries(sl-browser-page PRIVATE CEF::Wrapper)
+endif()
+
+target_compile_definitions(sl-browser-page PRIVATE ENABLE_BROWSER_SHARED_TEXTURE)
+target_compile_options(sl-browser-page PRIVATE $<IF:$<CONFIG:DEBUG>,/MTd,/MT>)
+target_link_options(sl-browser-page PRIVATE "LINKER:/IGNORE:4099" "LINKER:/SUBSYSTEM:WINDOWS")
+
+setup_plugin_target(sl-browser-page)

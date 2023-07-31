@@ -8,7 +8,7 @@
 #include <string>
 #include <filesystem>
 
-#include "GrpcPluginServer.h"
+#include "GrpcPlugin.h"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE("sl-browser-plugin", "en-US")
@@ -67,7 +67,7 @@ void obs_module_post_load(void)
 	memset(&si, NULL, sizeof(si));
 	si.cb = sizeof(si);
 
-	if (GrpcPluginServer::instance().start(myListenPort)) {
+	if (GrpcPlugin::instance().startServer(myListenPort)) {
 
 		try {
 			const char *module_path = obs_get_module_binary_path(obs_current_module());

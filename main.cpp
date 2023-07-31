@@ -127,20 +127,35 @@ void MyFunc(int arg)
 		CefRefPtr<CefDictionaryValue>(), nullptr);
 }
 
-
 int main(int argc, char *argv[])
 {
+	AllocConsole();
+	freopen("conin$", "r", stdin);
+	freopen("conout$", "w", stdout);
+	freopen("conout$", "w", stderr);
+	printf("Debugging Window:\n");
+
+	if (argc < 2)
+	{
+		printf("Not enough args.\n");
+		system("pause");
+		return 0;
+	}
+
+	int32_t parentListenPort = atoi(argv[0]);
+	int32_t myListenPort = atoi(argv[1]);
+
+	printf("parentListenPort = %d\n", parentListenPort);
+	printf("myListenPort = %d\n", myListenPort);
+
+	system("pause");
+
 	//Alloc Console
 	//print some stuff to the console
 	//make sure to include #include "stdio.h"
 	//note, you must use the #include <iostream>/ using namespace std
 	//to use the iostream... #incldue "iostream.h" didn't seem to work
 	//in my VC 6
-	AllocConsole();
-	freopen("conin$", "r", stdin);
-	freopen("conout$", "w", stdout);
-	freopen("conout$", "w", stderr);
-	printf("Debugging Window:\n");
 
 	// Create Qt Application
 	QApplication a(argc, argv);

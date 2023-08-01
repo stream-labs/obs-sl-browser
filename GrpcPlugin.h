@@ -8,11 +8,9 @@
 #include <grpcpp/grpcpp.h>
 #include <grpcpp/health_check_service_interface.h>
 
-class grpc_plugin_objImpl;
 class grpc_plugin_objClient;
 
-class GrpcPlugin
-{
+class GrpcPlugin {
 public:
 	static GrpcPlugin &instance()
 	{
@@ -25,8 +23,6 @@ public:
 
 	void stop();
 
-	grpc_plugin_objClient &getClientObj() const { return *m_clientObj.get(); }
-
 private:
 	~GrpcPlugin();
 
@@ -35,6 +31,6 @@ private:
 	std::wstring m_modulePath;
 	std::unique_ptr<grpc::Server> m_server;
 	std::unique_ptr<grpc::ServerBuilder> m_builder;
-	std::unique_ptr<grpc_plugin_objImpl> m_serverObj;
+	std::unique_ptr<grpc_plugin_obj::Service> m_serverObj;
 	std::unique_ptr<grpc_plugin_objClient> m_clientObj;
 };

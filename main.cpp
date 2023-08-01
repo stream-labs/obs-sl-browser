@@ -36,6 +36,7 @@
 #include "browser-scheme.hpp"
 #include "browser-app.hpp"
 #include "browser-version.h"
+#include "GrpcProxy.h"
 
 #include "json11/json11.hpp"
 #include "cef-headers.hpp"

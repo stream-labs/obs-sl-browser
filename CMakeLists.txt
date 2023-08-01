@@ -12,13 +12,14 @@ get_filename_component(papi_proto "sl_browser_api.proto" ABSOLUTE)
 get_filename_component(papi_proto_path "${papi_proto}" PATH)
 
 message ("hello")
-message (${CMAKE_CURRENT_BINARY_DIR})
+message ("${CMAKE_CURRENT_BINARY_DIR}")
 
 # Generated sources
 set(papi_proto_srcs "${CMAKE_CURRENT_BINARY_DIR}/sl_browser_api.pb.cc")
 set(papi_proto_hdrs "${CMAKE_CURRENT_BINARY_DIR}/sl_browser_api.pb.h")
 set(papi_grpc_srcs "${CMAKE_CURRENT_BINARY_DIR}/sl_browser_api.grpc.pb.cc")
 set(papi_grpc_hdrs "${CMAKE_CURRENT_BINARY_DIR}/sl_browser_api.grpc.pb.h")
+
 
 add_custom_command(
       OUTPUT "${papi_proto_srcs}" "${papi_proto_hdrs}" "${papi_grpc_srcs}" "${papi_grpc_hdrs}"
@@ -61,7 +62,7 @@ endif()
 target_sources(
   sl-browser
   PRIVATE main.cpp
-          GrpcClient.cpp
+          GrpcProxy.cpp
           browser-app.cpp
           browser-app.hpp
           browser-client.cpp
@@ -93,7 +94,12 @@ target_link_libraries(sl-browser PRIVATE
 	  ${_GRPC_GRPCPP}
 	  ${_PROTOBUF_LIBPROTOBUF})
 
-target_link_options(sl-browser PRIVATE /IGNORE:4099)
+target_link_options(sl-browser PRIVATE 
+  "/IGNORE:4099" # Ignore PDB warnings
+  "/IGNORE:4098" 
+)
+
+target_compile_options(sl-browser PRIVATE $<IF:$<CONFIG:DEBUG>,/MTd,/MT>)
 
 ## -- Plugin loaded by obs
 
@@ -116,6 +122,11 @@ target_link_libraries(sl-browser-plugin PRIVATE
   ${_REFLECTION}
   ${_GRPC_GRPCPP}
   ${_PROTOBUF_LIBPROTOBUF})
+
+  target_link_options(sl-browser-plugin PRIVATE 
+    "/IGNORE:4099" # Ignore PDB warnings
+    "/IGNORE:4098" 
+  )
 
 ## -- Helper proxy children
 

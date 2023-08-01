@@ -1,4 +1,4 @@
-#include "GrpcPlugin.h"
+#include "GrpcProxy.h"
 
 #include <filesystem>
 
@@ -7,8 +7,7 @@
 * Receiving messages from the proxy
 */
 
-class grpc_plugin_objImpl final : public grpc_plugin_obj::Service
-{
+class grpc_proxy_objImpl final : public grpc_proxy_obj::Service{
 	grpc::Status com_grpc_dispatcher(grpc::ServerContext *context, const grpc_example_Request *request, grpc_example_Reply *response) override
 	{
 		return grpc::Status::OK;
@@ -20,9 +19,9 @@ class grpc_plugin_objImpl final : public grpc_plugin_obj::Service
 * Sending messages to the proxy
 */
 
-class grpc_plugin_objClient {
+class grpc_proxy_objClient {
 public:
-	grpc_plugin_objClient(std::shared_ptr<grpc::Channel> channel) : stub_(grpc_plugin_obj::NewStub(channel))
+	grpc_proxy_objClient(std::shared_ptr<grpc::Channel> channel) : stub_(grpc_proxy_obj::NewStub(channel))
 	{
 		m_connected = channel->WaitForConnected(std::chrono::system_clock::now() + std::chrono::seconds(3));
 	}
@@ -47,21 +46,21 @@ public:
 	std::atomic<bool> m_connected{false};
 
 private:
-	std::unique_ptr<grpc_plugin_obj::Stub> stub_;
+	std::unique_ptr<grpc_proxy_obj::Stub> stub_;
 };
 
 // Grpc
 //
 
-GrpcPlugin::~GrpcPlugin() {
+GrpcProxy::~GrpcProxy() {
 
 }
 
-bool GrpcPlugin::startServer(int32_t listenPort)
+bool GrpcProxy::startServer(int32_t listenPort)
 {
 	// Don't repeat
 	if (m_listenPort != 0)
-		return;
+		return false;
 
 	m_listenPort = listenPort;
 
@@ -71,7 +70,7 @@ bool GrpcPlugin::startServer(int32_t listenPort)
 	m_builder = std::make_unique<grpc::ServerBuilder>();
 	m_builder->AddListeningPort(std::string("localhost:") + std::to_string(m_listenPort), grpc::InsecureServerCredentials());
 
-	m_serverObj = std::make_unique<grpc_plugin_objImpl>();
+	m_serverObj = std::make_unique<grpc_proxy_objImpl>();
 	m_builder->RegisterService(m_serverObj.get());
 
 	m_server = m_builder->BuildAndStart();
@@ -79,15 +78,14 @@ bool GrpcPlugin::startServer(int32_t listenPort)
 	return m_server != nullptr;
 }
 
-bool GrpcPlugin::connectToClient(int32_t portNumber)
+bool GrpcProxy::connectToClient(int32_t portNumber)
 {
-	m_clientObj = std::make_unique<grpc_plugin_objClient>(
+	auto m_clientObj = std::make_unique<grpc_proxy_objClient>(
 		grpc::CreateChannel("localhost:" + std::to_string(portNumber), grpc::InsecureChannelCredentials()));
 
 	return m_clientObj != nullptr;
 }
 
-void GrpcPlugin::stop()
-{
+void GrpcProxy::stop() {
 
 }

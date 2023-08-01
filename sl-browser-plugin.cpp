@@ -22,8 +22,14 @@ bool obs_module_load(void)
 	return true;
 }
 
+BOOL launched = FALSE;
+PROCESS_INFORMATION slProcessInfo;
+
 void obs_module_post_load(void)
 {
+	if (launched)
+		return;
+
 	AllocConsole();
 	freopen("conin$", "r", stdin);
 	freopen("conout$", "w", stdout);
@@ -60,9 +66,6 @@ void obs_module_post_load(void)
 	int32_t myListenPort = chooseProxyPort();
 	int32_t targetListenPort = chooseProxyPort();
 
-	BOOL launched = FALSE;
-
-	PROCESS_INFORMATION slProcessInfo;
 	STARTUPINFOW si;
 	memset(&si, NULL, sizeof(si));
 	si.cb = sizeof(si);
@@ -86,13 +89,25 @@ void obs_module_post_load(void)
 		} catch (...) {
 			blog(LOG_ERROR, "Streamlabs: obs_module_post_load catch while launching server");
 		}
+
+		if (launched && !GrpcPlugin::instance().connectToClient(targetListenPort))
+		{
+			launched = FALSE;
+			blog(LOG_ERROR, "Streamlabs: obs_module_post_load can't connect to process, GetLastError = %d", GetLastError());
+
+			// Terminates the process
+			TerminateProcess(slProcessInfo.hProcess, EXIT_SUCCESS);
+			CloseHandle(slProcessInfo.hProcess);
+			CloseHandle(slProcessInfo.hThread);
+		}
 	}
 
+	std::string errorMsg =
+		"Failed to initialize plugin " + std::string(obs_module_description()) + "\nRestart the application and try again.";
+
 	if (!launched) {
-		std::string errorMsg = "Failed to launch " + (std::string)obs_module_description();
-		errorMsg += "\nYou may restart the application and try again.";
 		::MessageBoxA(NULL, errorMsg.c_str(), "Streamlabs Error", MB_ICONERROR | MB_TOPMOST);
-		blog(LOG_ERROR, "Streamlabs: obs_module_post_load can't start vst server, GetLastError = %d", GetLastError());
+		blog(LOG_ERROR, "Streamlabs: obs_module_post_load can't start proxy process, GetLastError = %d", GetLastError());
 		return;
 	}
 }
@@ -100,4 +115,13 @@ void obs_module_post_load(void)
 void obs_module_unload(void)
 {
 
+	// Tell process to shut down and wait?
+	// ;
+		
+	GrpcPlugin::instance().stop();
+
+	// Terminates the process (it shouldn't exist)
+	TerminateProcess(slProcessInfo.hProcess, EXIT_SUCCESS);
+	CloseHandle(slProcessInfo.hProcess);
+	CloseHandle(slProcessInfo.hThread);
 }

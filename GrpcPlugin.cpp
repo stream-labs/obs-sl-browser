@@ -61,7 +61,7 @@ bool GrpcPlugin::startServer(int32_t listenPort)
 {
 	// Don't repeat
 	if (m_listenPort != 0)
-		return;
+		return false;
 
 	m_listenPort = listenPort;
 
@@ -81,7 +81,7 @@ bool GrpcPlugin::startServer(int32_t listenPort)
 
 bool GrpcPlugin::connectToClient(int32_t portNumber)
 {
-	m_clientObj = std::make_unique<grpc_plugin_objClient>(
+	auto m_clientObj = std::make_unique<grpc_plugin_objClient>(
 		grpc::CreateChannel("localhost:" + std::to_string(portNumber), grpc::InsecureChannelCredentials()));
 
 	return m_clientObj != nullptr;
@@ -89,5 +89,9 @@ bool GrpcPlugin::connectToClient(int32_t portNumber)
 
 void GrpcPlugin::stop()
 {
-
+	if (m_server != nullptr)
+	{
+		m_server->Shutdown();
+		m_server->Wait();
+	}
 }

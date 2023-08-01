@@ -100,6 +100,7 @@ target_link_options(sl-browser PRIVATE
 )
 
 target_compile_options(sl-browser PRIVATE $<IF:$<CONFIG:DEBUG>,/MTd,/MT>)
+target_compile_definitions(sl-browser PRIVATE NOMINMAX)
 
 ## -- Plugin loaded by obs
 
@@ -123,10 +124,13 @@ target_link_libraries(sl-browser-plugin PRIVATE
   ${_GRPC_GRPCPP}
   ${_PROTOBUF_LIBPROTOBUF})
 
-  target_link_options(sl-browser-plugin PRIVATE 
-    "/IGNORE:4099" # Ignore PDB warnings
-    "/IGNORE:4098" 
-  )
+target_link_options(sl-browser-plugin PRIVATE 
+  "/IGNORE:4099" # Ignore PDB warnings
+  "/IGNORE:4098" 
+)
+
+target_compile_options(sl-browser-plugin PRIVATE $<IF:$<CONFIG:DEBUG>,/MTd,/MT>)
+target_compile_definitions(sl-browser-plugin PRIVATE NOMINMAX)
 
 ## -- Helper proxy children
 

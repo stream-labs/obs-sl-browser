@@ -53,6 +53,11 @@ private:
 // Grpc
 //
 
+
+GrpcPlugin::GrpcPlugin() {
+
+}
+
 GrpcPlugin::~GrpcPlugin() {
 
 }
@@ -81,7 +86,7 @@ bool GrpcPlugin::startServer(int32_t listenPort)
 
 bool GrpcPlugin::connectToClient(int32_t portNumber)
 {
-	auto m_clientObj = std::make_unique<grpc_plugin_objClient>(
+	m_clientObj = std::make_unique<grpc_plugin_objClient>(
 		grpc::CreateChannel("localhost:" + std::to_string(portNumber), grpc::InsecureChannelCredentials()));
 
 	return m_clientObj != nullptr;

@@ -24,6 +24,7 @@ public:
 	void stop();
 
 private:
+	GrpcPlugin();
 	~GrpcPlugin();
 
 	int32_t m_listenPort{0};

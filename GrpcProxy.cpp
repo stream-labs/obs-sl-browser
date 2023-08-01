@@ -52,6 +52,10 @@ private:
 // Grpc
 //
 
+GrpcProxy::GrpcProxy() {
+
+}
+
 GrpcProxy::~GrpcProxy() {
 
 }
@@ -80,7 +84,7 @@ bool GrpcProxy::startServer(int32_t listenPort)
 
 bool GrpcProxy::connectToClient(int32_t portNumber)
 {
-	auto m_clientObj = std::make_unique<grpc_proxy_objClient>(
+	m_clientObj = std::make_unique<grpc_proxy_objClient>(
 		grpc::CreateChannel("localhost:" + std::to_string(portNumber), grpc::InsecureChannelCredentials()));
 
 	return m_clientObj != nullptr;

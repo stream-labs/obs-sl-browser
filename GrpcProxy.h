@@ -8,8 +8,9 @@
 #include <grpcpp/grpcpp.h>
 #include <grpcpp/health_check_service_interface.h>
 
-class GrpcProxy
-{
+class grpc_proxy_objClient;
+
+class GrpcProxy {
 public:
 	static GrpcProxy &instance()
 	{
@@ -23,6 +24,7 @@ public:
 	void stop();
 
 private:
+	GrpcProxy();
 	~GrpcProxy();
 
 	int32_t m_listenPort{0};
@@ -31,4 +33,5 @@ private:
 	std::unique_ptr<grpc::Server> m_server;
 	std::unique_ptr<grpc::ServerBuilder> m_builder;
 	std::unique_ptr<grpc_proxy_obj::Service> m_serverObj;
+	std::unique_ptr<grpc_proxy_objClient> m_clientObj;
 };

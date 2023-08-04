@@ -8,7 +8,17 @@
 #include <grpcpp/grpcpp.h>
 #include <grpcpp/health_check_service_interface.h>
 
-class grpc_proxy_objClient;
+class grpc_proxy_objClient {
+public:
+	grpc_proxy_objClient(std::shared_ptr<grpc::Channel> channel);
+
+	bool do_grpc_example_Request(int param1);
+	
+	std::atomic<bool> m_connected{false};
+
+private:
+	std::unique_ptr<grpc_plugin_obj::Stub> stub_;
+};
 
 class GrpcProxy {
 public:
@@ -22,6 +32,9 @@ public:
 	bool startServer(int32_t port);
 
 	void stop();
+
+	auto *getClient() { return m_clientObj.get(); }
+
 
 private:
 	GrpcProxy();

@@ -11,6 +11,8 @@ class grpc_plugin_objImpl final : public grpc_plugin_obj::Service
 {
 	grpc::Status com_grpc_dispatcher(grpc::ServerContext *context, const grpc_example_Request *request, grpc_example_Reply *response) override
 	{
+		printf("GrpcPlugin client got %d\n", request->param1());
+		response->set_param1(12345);
 		return grpc::Status::OK;
 	}
 };
@@ -22,7 +24,8 @@ class grpc_plugin_objImpl final : public grpc_plugin_obj::Service
 
 class grpc_plugin_objClient {
 public:
-	grpc_plugin_objClient(std::shared_ptr<grpc::Channel> channel) : stub_(grpc_plugin_obj::NewStub(channel))
+	grpc_plugin_objClient(std::shared_ptr<grpc::Channel> channel) :
+		stub_(grpc_proxy_obj::NewStub(channel))
 	{
 		m_connected = channel->WaitForConnected(std::chrono::system_clock::now() + std::chrono::seconds(3));
 	}
@@ -40,14 +43,13 @@ public:
 			return m_connected = false;
 
 		printf("Got back %lld\n", reply.param1());
-
 		return true;
 	}
 
 	std::atomic<bool> m_connected{false};
 
 private:
-	std::unique_ptr<grpc_plugin_obj::Stub> stub_;
+	std::unique_ptr<grpc_proxy_obj::Stub> stub_;
 };
 
 // Grpc

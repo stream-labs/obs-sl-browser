@@ -66,6 +66,8 @@ void obs_module_post_load(void)
 	int32_t myListenPort = chooseProxyPort();
 	int32_t targetListenPort = chooseProxyPort();
 
+	printf("Sending %d and %d to proxy\n", myListenPort, targetListenPort);
+
 	STARTUPINFOW si;
 	memset(&si, NULL, sizeof(si));
 	si.cb = sizeof(si);
@@ -81,9 +83,9 @@ void obs_module_post_load(void)
 			std::wstring process_path =
 				std::filesystem::u8path(module_path).remove_filename().wstring() + L"/sl-browser.exe";
 
-			std::wstring startparams =
-				L"sl-browser \"" + std::to_wstring(myListenPort) + L" " + std::to_wstring(targetListenPort);
+			std::wstring startparams = L"sl-browser " + std::to_wstring(myListenPort) + L" " + std::to_wstring(targetListenPort);
 
+			wprintf(L"start params = %s\n", startparams.c_str());
 			launched = CreateProcessW(process_path.c_str(), (LPWSTR)startparams.c_str(), NULL, NULL, FALSE, CREATE_NEW_CONSOLE,
 						  NULL, NULL, &si, &slProcessInfo);
 		} catch (...) {

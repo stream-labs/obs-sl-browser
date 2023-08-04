@@ -136,18 +136,33 @@ int main(int argc, char *argv[])
 	freopen("conout$", "w", stderr);
 	printf("Debugging Window:\n");
 
-	if (argc < 2)
+	if (argc < 3)
 	{
 		printf("Not enough args.\n");
 		system("pause");
 		return 0;
 	}
 
-	int32_t parentListenPort = atoi(argv[0]);
-	int32_t myListenPort = atoi(argv[1]);
+	int32_t parentListenPort = atoi(argv[1]);
+	int32_t myListenPort = atoi(argv[2]);
+
+	if (!GrpcProxy::instance().startServer(myListenPort))
+	{
+		printf("sl-proxy: failed to start grpc server, GetLastError = %d\n", GetLastError());
+		return 0;
+	}
+
+	if (!GrpcProxy::instance().connectToClient(parentListenPort)) {
+		printf("sl-proxy: failed to connected to plugin's grpc server, GetLastError = %d\n", GetLastError());
+		return 0;
+	}
 
 	printf("parentListenPort = %d\n", parentListenPort);
 	printf("myListenPort = %d\n", myListenPort);
+
+	system("pause");
+
+	GrpcProxy::instance().getClient()->do_grpc_example_Request(1234567);
 
 	system("pause");
 

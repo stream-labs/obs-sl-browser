@@ -67,8 +67,7 @@ static void BrowserInit()
 	CefSettings settings;
 	settings.log_severity = LOGSEVERITY_VERBOSE;
 
-	//todo
-	CefString(&settings.user_agent_product) = "Testing";
+	CefString(&settings.user_agent_product) = "Streamlabs";
 
 	//todo
 	CefString(&settings.locale) = "en-US";
@@ -77,9 +76,11 @@ static void BrowserInit()
 	settings.persist_user_preferences = 1;
 
 	//todo
-	//CefString(&settings.cache_path) = "C:/User/srogers/Desktop/debugging/";
+	CefString(&settings.cache_path) = "C:\\Users\\srogers\\AppData\\Roaming\\obs-studio\\plugin_config\\obs-browser - Copy";
 
 	CefString(&settings.browser_subprocess_path) = path.c_str();
+
+	//printf("%s\n", settings.cache_path.str);
 
 	app = new BrowserApp();
 
@@ -110,14 +111,14 @@ static void BrowserManagerThread(void)
 QWidget* widget = nullptr;
 CefRefPtr<CefBrowser> browser = nullptr;
 
-	// Define a function.
+// Define a function.
 void MyFunc(int arg)
 {
 	// Create CEF Browser
 	CefWindowInfo window_info;
 	CefBrowserSettings browser_settings;
 	CefRefPtr<BrowserClient> browserClient = new BrowserClient(true, false);
-	CefString url = "http://www.google.com";
+	CefString url = "https://codepen.io/liammclennan/pen/boMevM";
 
 	// Now set the parent of the CEF browser to the QWidget
 	window_info.SetAsChild((HWND)widget->winId(),
@@ -166,14 +167,10 @@ int main(int argc, char *argv[])
 
 	system("pause");
 
-	//Alloc Console
-	//print some stuff to the console
-	//make sure to include #include "stdio.h"
-	//note, you must use the #include <iostream>/ using namespace std
-	//to use the iostream... #incldue "iostream.h" didn't seem to work
-	//in my VC 6
-
 	// Create Qt Application
+	// requires
+	// - qt dll's
+	// - platforms folder
 	QApplication a(argc, argv);
 
 	// Create CEF Browser

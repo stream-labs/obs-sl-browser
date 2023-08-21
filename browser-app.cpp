@@ -19,6 +19,7 @@
 #include "browser-app.hpp"
 #include "browser-version.h"
 #include <json11/json11.hpp>
+#include "JavascriptApi.h"
 
 #include <windows.h>
 
@@ -76,7 +77,22 @@ void BrowserApp::OnContextCreated(CefRefPtr<CefBrowser> browser,
 				  CefRefPtr<CefFrame>,
 				  CefRefPtr<CefV8Context> context)
 {
-	
+	AllocConsole();
+	freopen("conin$", "r", stdin);
+	freopen("conout$", "w", stdout);
+	freopen("conout$", "w", stderr);
+	printf("Debugging Window:\n");
+
+	printf("Hey\n");
+
+	CefRefPtr<CefV8Value> globalObj = context->GetGlobal();
+
+	CefRefPtr<CefV8Value> slabsGlobal = CefV8Value::CreateObject(nullptr, nullptr);
+	globalObj->SetValue("slabsGlobal", slabsGlobal, V8_PROPERTY_ATTRIBUTE_NONE);
+	slabsGlobal->SetValue("pluginVersion", CefV8Value::CreateString(OBS_BROWSER_VERSION_STRING), V8_PROPERTY_ATTRIBUTE_NONE);
+
+	for (const std::string &name : JavascriptApi::getGlobalFunctionNames()) 
+		slabsGlobal->SetValue(name, CefV8Value::CreateFunction(name, this), V8_PROPERTY_ATTRIBUTE_NONE);
 }
 
 
@@ -85,8 +101,6 @@ bool BrowserApp::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser,
 					  CefProcessId source_process,
 					  CefRefPtr<CefProcessMessage> message)
 {
-	
-
 	return true;
 }
 
@@ -94,5 +108,38 @@ bool BrowserApp::Execute(const CefString &name, CefRefPtr<CefV8Value>,
 			 const CefV8ValueList &arguments,
 			 CefRefPtr<CefV8Value> &, CefString &)
 {
+	printf("BrowserApp::Execute %s\n", name.ToString().c_str());
+
+	if (JavascriptApi::isValidFunctionName(name.ToString())) {
+
+		CefRefPtr<CefProcessMessage> msg = CefProcessMessage::Create(name);
+		CefRefPtr<CefListValue> args = msg->GetArgumentList();
+
+		/* Pass on arguments */
+		for (u_long l = 0; l < arguments.size(); l++) {
+			u_long pos;
+			if (arguments[0]->IsFunction())
+				pos = l;
+			else
+				pos = l + 1;
+
+			if (arguments[l]->IsString())
+				args->SetString(pos, arguments[l]->GetStringValue());
+			else if (arguments[l]->IsInt())
+				args->SetInt(pos, arguments[l]->GetIntValue());
+			else if (arguments[l]->IsBool())
+				args->SetBool(pos, arguments[l]->GetBoolValue());
+			else if (arguments[l]->IsDouble())
+				args->SetDouble(pos, arguments[l]->GetDoubleValue());
+		}
+
+		CefRefPtr<CefBrowser> browser = CefV8Context::GetCurrentContext()->GetBrowser();
+		SendBrowserProcessMessage(browser, PID_BROWSER, msg);
+
+	} else {
+		/* Function does not exist. */
+		return false;
+	}
+
 	return true;
 }

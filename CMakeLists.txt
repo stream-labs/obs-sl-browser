@@ -113,7 +113,12 @@ target_sources(
     ${papi_proto_srcs}
     ${papi_grpc_srcs})
 
+target_link_libraries(sl-browser-plugin PRIVATE Qt::Widgets)
+target_link_libraries(sl-browser-plugin PRIVATE Qt::Core)
+target_link_libraries(sl-browser-plugin PRIVATE Qt::Gui)
+
 target_include_directories(sl-browser-plugin PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/deps")
+target_include_directories(sl-browser-plugin PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../obs-browser/panel/")
 
 target_compile_features(sl-browser-plugin PRIVATE cxx_std_17)
 target_link_libraries(sl-browser-plugin PRIVATE OBS::libobs OBS::frontend-api)

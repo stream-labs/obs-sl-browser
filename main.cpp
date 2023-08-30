@@ -118,7 +118,7 @@ void MyFunc(int arg)
 	CefWindowInfo window_info;
 	CefBrowserSettings browser_settings;
 	CefRefPtr<BrowserClient> browserClient = new BrowserClient(true, false);
-	CefString url = "https://codepen.io/liammclennan/pen/boMevM";
+	CefString url = "C:/Users/srogers/Desktop/index.html";
 
 	// Now set the parent of the CEF browser to the QWidget
 	window_info.SetAsChild((HWND)widget->winId(),
@@ -160,12 +160,6 @@ int main(int argc, char *argv[])
 
 	printf("parentListenPort = %d\n", parentListenPort);
 	printf("myListenPort = %d\n", myListenPort);
-
-	system("pause");
-
-	GrpcProxy::instance().getClient()->do_grpc_example_Request(1234567);
-
-	system("pause");
 
 	// Create Qt Application
 	// requires

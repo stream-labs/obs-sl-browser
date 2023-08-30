@@ -145,4 +145,7 @@ public:
 			       int httpStatusCode) override;
 
 	IMPLEMENT_REFCOUNTING(BrowserClient);
+
+public:
+	static std::string cefListValueToJSONString(CefRefPtr<CefListValue> listValue);
 };

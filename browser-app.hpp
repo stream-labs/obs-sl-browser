@@ -30,6 +30,9 @@ class BrowserApp : public CefApp,
 		   public CefBrowserProcessHandler,
 		   public CefV8Handler {
 
+	std::atomic<int> m_callbackIdCounter = 0;
+	std::map<int, CefRefPtr<CefV8Value>> m_callbackMap;
+
 public:
 	inline BrowserApp() {}
 

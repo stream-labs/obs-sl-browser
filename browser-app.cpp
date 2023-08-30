@@ -77,24 +77,15 @@ void BrowserApp::OnContextCreated(CefRefPtr<CefBrowser> browser,
 				  CefRefPtr<CefFrame>,
 				  CefRefPtr<CefV8Context> context)
 {
-	AllocConsole();
-	freopen("conin$", "r", stdin);
-	freopen("conout$", "w", stdout);
-	freopen("conout$", "w", stderr);
-	printf("Debugging Window:\n");
-
-	printf("Hey\n");
-
 	CefRefPtr<CefV8Value> globalObj = context->GetGlobal();
 
 	CefRefPtr<CefV8Value> slabsGlobal = CefV8Value::CreateObject(nullptr, nullptr);
 	globalObj->SetValue("slabsGlobal", slabsGlobal, V8_PROPERTY_ATTRIBUTE_NONE);
 	slabsGlobal->SetValue("pluginVersion", CefV8Value::CreateString(OBS_BROWSER_VERSION_STRING), V8_PROPERTY_ATTRIBUTE_NONE);
 
-	for (const std::string &name : JavascriptApi::getGlobalFunctionNames()) 
-		slabsGlobal->SetValue(name, CefV8Value::CreateFunction(name, this), V8_PROPERTY_ATTRIBUTE_NONE);
+	for (auto &itr : JavascriptApi::getGlobalFunctionNames()) 
+		slabsGlobal->SetValue(itr.first, CefV8Value::CreateFunction(itr.first, this), V8_PROPERTY_ATTRIBUTE_NONE);
 }
-
 
 bool BrowserApp::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser,
 					  CefRefPtr<CefFrame> frame,
@@ -108,12 +99,18 @@ bool BrowserApp::Execute(const CefString &name, CefRefPtr<CefV8Value>,
 			 const CefV8ValueList &arguments,
 			 CefRefPtr<CefV8Value> &, CefString &)
 {
-	printf("BrowserApp::Execute %s\n", name.ToString().c_str());
-
 	if (JavascriptApi::isValidFunctionName(name.ToString())) {
+
+		int callBackId = 0;
+
+		if (arguments.size() >= 1 && arguments[0]->IsFunction()) {
+			callBackId = ++m_callbackIdCounter;
+			m_callbackMap[callBackId] = arguments[0];
+		}
 
 		CefRefPtr<CefProcessMessage> msg = CefProcessMessage::Create(name);
 		CefRefPtr<CefListValue> args = msg->GetArgumentList();
+		args->SetInt(0, callBackId);
 
 		/* Pass on arguments */
 		for (u_long l = 0; l < arguments.size(); l++) {

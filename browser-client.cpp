@@ -19,14 +19,12 @@
 #include "browser-client.hpp"
 #include "base64/base64.hpp"
 #include "json11/json11.hpp"
+
 #include <QApplication>
 #include <QThread>
 #include <QToolTip>
-#if defined(__APPLE__) && CHROME_VERSION_BUILD > 4430
-#include <IOSurface/IOSurface.h>
-#endif
 
-using namespace json11;
+#include "GrpcProxy.h"
 
 inline bool BrowserClient::valid() const
 {
@@ -109,31 +107,89 @@ void BrowserClient::OnBeforeContextMenu(CefRefPtr<CefBrowser>,
 	model->Clear();
 }
 
+/*static*/
+json11::Json convertCefValueToJSON(CefRefPtr<CefValue> value)
+{
+	switch (value->GetType()) {
+	case VTYPE_NULL:
+		return nullptr;
+
+	case VTYPE_BOOL:
+		return value->GetBool();
+
+	case VTYPE_INT:
+		return value->GetInt();
+
+	case VTYPE_DOUBLE:
+		return value->GetDouble();
+
+	case VTYPE_STRING:
+		return value->GetString().ToString();
+
+	case VTYPE_LIST: {
+		const auto &list = value->GetList();
+		std::vector<json11::Json> jsonList;
+		for (size_t i = 0; i < list->GetSize(); ++i) {
+			jsonList.push_back(convertCefValueToJSON(list->GetValue(i)));
+		}
+		return jsonList;
+	}
+
+	case VTYPE_DICTIONARY: {
+		const auto &dict = value->GetDictionary();
+		std::map<std::string, json11::Json> jsonMap;
+		CefDictionaryValue::KeyList keys;
+		dict->GetKeys(keys);
+		for (const auto &key : keys) {
+			jsonMap[key] = convertCefValueToJSON(dict->GetValue(key));
+		}
+		return jsonMap;
+	}
+
+	default:
+		return nullptr;
+	}
+}
+
+/*static*/
+std::string BrowserClient::cefListValueToJSONString(CefRefPtr<CefListValue> listValue)
+{
+	std::map<std::string, json11::Json> jsonMap;
+	for (size_t i = 0; i < listValue->GetSize(); ++i) {
+		// Convert index to string key like "param1", "param2", ...
+		std::string key = "param" + std::to_string(i + 1);
+		jsonMap[key] = convertCefValueToJSON(listValue->GetValue(i));
+	}
+
+	std::string json_str;
+	json_str = json11::Json(jsonMap).dump();
+	return json_str;
+}
+
 bool BrowserClient::OnProcessMessageReceived(
 	CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame>, CefProcessId,
 	CefRefPtr<CefProcessMessage> message)
 {
-	while (true)
-		Sleep(1);
-
-	printf("Hey\n");
-
 	const std::string &name = message->GetName();
 	CefRefPtr<CefListValue> input_args = message->GetArgumentList();
-	Json json;
-
+	
 	if (!valid()) {
 		return false;
 	}
 
-	CefRefPtr<CefProcessMessage> msg =
-		CefProcessMessage::Create("executeCallback");
+	if (!GrpcProxy::instance().getClient()->send_js_api(name, cefListValueToJSONString(input_args)))
+	{
+		// todo; handle
+		abort();
+		return false;
+	}
 
-	CefRefPtr<CefListValue> execute_args = msg->GetArgumentList();
-	execute_args->SetInt(0, input_args->GetInt(0));
-	execute_args->SetString(1, json.dump());
-
-	SendBrowserProcessMessage(browser, PID_RENDERER, msg);
+	// Sends back to the render proxy process
+	//CefRefPtr<CefProcessMessage> msg = CefProcessMessage::Create("executeCallback");
+	//CefRefPtr<CefListValue> execute_args = msg->GetArgumentList();
+	//execute_args->SetInt(0, input_args->GetInt(0));
+	//execute_args->SetString(1, "{}");
+	//SendBrowserProcessMessage(browser, PID_RENDERER, msg);
 
 	return true;
 }
@@ -241,16 +297,6 @@ void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, 
 	}
 
 	if (frame->IsMain()) {
-		//std::string uriEncodedCSS =
-		//	CefURIEncode(bs->css, false).ToString();
-		//
-		//std::string script;
-		//script += "const obsCSS = document.createElement('style');";
-		//script += "obsCSS.innerHTML = decodeURIComponent(\"" +
-		//	  uriEncodedCSS + "\");";
-		//script += "document.querySelector('head').appendChild(obsCSS);";
-		//
-		//frame->ExecuteJavaScript(script, "", 0);
 	}
 }
 

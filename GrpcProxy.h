@@ -12,7 +12,7 @@ class grpc_proxy_objClient {
 public:
 	grpc_proxy_objClient(std::shared_ptr<grpc::Channel> channel);
 
-	bool do_grpc_example_Request(int param1);
+	bool send_js_api(const std::string& funcName, const std::string& params);
 	
 	std::atomic<bool> m_connected{false};
 

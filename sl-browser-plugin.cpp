@@ -12,6 +12,8 @@
 #include <QDockWidget>
 
 #include "GrpcPlugin.h"
+#include "PluginJsHandler.h"
+#include "WebSocketServer.h"
 
 #include "C:\github\obs-studio\UI\window-dock-browser.hpp"
 
@@ -30,50 +32,6 @@ bool obs_module_load(void)
 BOOL launched = FALSE;
 PROCESS_INFORMATION slProcessInfo;
 
-void workerThread()
-{
-	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
-
-	while (true) {
-
-		// Execute this lambda in the context of the main GUI thread.
-		QMetaObject::invokeMethod(
-			mainWindow,
-			[mainWindow]() {
-				// This code is executed in the context of the QMainWindow's thread.
-
-				// For example:
-				QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
-				foreach(QDockWidget * dock, docks)
-				{
-					if (dock->property("uuid").isValid()) {
-
-						printf("Dock with objectName: %s has a uuid property.\n",
-						       dock->objectName().toStdString().c_str());
-
-
-						BrowserDock *ptr = (BrowserDock *)dock;
-
-						ptr->cefWidget->setURL("google.com");
-						ptr->cefWidget->executeJavaScript("etc");
-						//...
-
-					}
-				}
-
-				// Or add a dock widget
-				// QDockWidget *newDock = new QDockWidget();
-				// mainWindow->addDockWidget(Qt::LeftDockWidgetArea, newDock);
-			},
-			Qt::BlockingQueuedConnection); // BlockingQueuedConnection waits until the slot (in this case, the lambda) has been executed.
-
-
-		Sleep(10000);
-	}
-}
-
-std::thread workerthr;
-
 void obs_module_post_load(void)
 {
 	if (launched)
@@ -85,7 +43,8 @@ void obs_module_post_load(void)
 	freopen("conout$", "w", stderr);
 	printf("Debugging Window:\n");
 
-	workerthr = std::thread(workerThread);
+	WebSocketServer::instance().start();
+	PluginJsHandler::instance().start();
 
 	auto chooseProxyPort = []()
 	{
@@ -178,3 +137,49 @@ void obs_module_unload(void)
 	CloseHandle(slProcessInfo.hProcess);
 	CloseHandle(slProcessInfo.hThread);
 }
+
+// test code
+/*void workerThread()
+{
+	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
+
+	while (true) {
+
+		// Execute this lambda in the context of the main GUI thread.
+		QMetaObject::invokeMethod(
+			mainWindow,
+			[mainWindow]() {
+				// This code is executed in the context of the QMainWindow's thread.
+
+				// For example:
+				QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
+				foreach(QDockWidget * dock, docks)
+				{
+					if (dock->property("uuid").isValid()) {
+
+						printf("Dock with objectName: %s has a uuid property.\n",
+						       dock->objectName().toStdString().c_str());
+
+
+						BrowserDock *ptr = (BrowserDock *)dock;
+
+						ptr->cefWidget->setURL("google.com");
+						ptr->cefWidget->executeJavaScript("etc");
+						//...
+
+					}
+				}
+
+				// Or add a dock widget
+				// QDockWidget *newDock = new QDockWidget();
+				// mainWindow->addDockWidget(Qt::LeftDockWidgetArea, newDock);
+			},
+			Qt::BlockingQueuedConnection); // BlockingQueuedConnection waits until the slot (in this case, the lambda) has been executed.
+
+
+		Sleep(10000);
+	}
+}*/
+
+//std::thread workerthr;
+//workerthr = std::thread(workerThread);

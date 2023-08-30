@@ -4,42 +4,41 @@
 
 /***
 * Server
-* Receiving messages from the proxy
+* Receiving messages from the plugin
 */
 
 class grpc_proxy_objImpl final : public grpc_proxy_obj::Service{
-	grpc::Status com_grpc_dispatcher(grpc::ServerContext *context, const grpc_example_Request *request, grpc_example_Reply *response) override
+	grpc::Status com_grpc_js_executeCallback(grpc::ServerContext *context, const grpc_js_api_ExecuteCallback *request,
+				     grpc_js_api_Reply *response) override
 	{
-		printf("GrpcProxy server got %d\n", request->param1());
-		response->set_param1(1235);
 		return grpc::Status::OK;
 	}
 };
 
 /***
 * Client
-* Sending messages to the proxy
+* Sending messages to the plugin
 */
 
 grpc_proxy_objClient::grpc_proxy_objClient(std::shared_ptr<grpc::Channel> channel) :
-		stub_(grpc_plugin_obj::NewStub(channel))
-	{
-		m_connected = channel->WaitForConnected(std::chrono::system_clock::now() + std::chrono::seconds(3));
-	}
-
-bool grpc_proxy_objClient::do_grpc_example_Request(int param1)
+	stub_(grpc_plugin_obj::NewStub(channel))
 {
-	grpc_example_Request request;
-	request.set_param1(param1);
+	m_connected = channel->WaitForConnected(std::chrono::system_clock::now() + std::chrono::seconds(3));
+}
 
-	grpc_example_Reply reply;
+bool grpc_proxy_objClient::send_js_api(const std::string &funcName, const std::string &params)
+{
+	grpc_js_api_Request request;
+	request.set_funcname(funcName);
+	request.set_params(params);
+
+	grpc_js_api_Reply reply;
 	grpc::ClientContext context;
-	grpc::Status status = stub_->com_grpc_dispatcher(&context, request, &reply);
+	grpc::Status status = stub_->com_grpc_js_api(&context, request, &reply);
 
 	if (!status.ok())
 		return m_connected = false;
 
-	printf("GrpcProxy client got back %lld\n", reply.param1());
 	return true;
 }
 

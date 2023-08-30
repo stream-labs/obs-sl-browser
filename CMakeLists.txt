@@ -20,7 +20,6 @@ set(papi_proto_hdrs "${CMAKE_CURRENT_BINARY_DIR}/sl_browser_api.pb.h")
 set(papi_grpc_srcs "${CMAKE_CURRENT_BINARY_DIR}/sl_browser_api.grpc.pb.cc")
 set(papi_grpc_hdrs "${CMAKE_CURRENT_BINARY_DIR}/sl_browser_api.grpc.pb.h")
 
-
 add_custom_command(
       OUTPUT "${papi_proto_srcs}" "${papi_proto_hdrs}" "${papi_grpc_srcs}" "${papi_grpc_hdrs}"
       COMMAND ${CMAKE_COMMAND} -E echo "Running protoc"
@@ -31,7 +30,6 @@ add_custom_command(
         --plugin=protoc-gen-grpc="${_GRPC_CPP_PLUGIN_EXECUTABLE}"
         "${papi_proto}"
       DEPENDS "${papi_proto}")
-
 
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 
@@ -104,19 +102,29 @@ target_compile_definitions(sl-browser PRIVATE NOMINMAX)
 
 ## -- Plugin loaded by obs
 
+set(LIBWEBSOCKETS_LIB "" CACHE PATH "Path to libwebsockets library")
+set(LIBWEBSOCKETS_INCLUDE "" CACHE PATH "Path to libwebsockets include directory")
+set(LIBWEBSOCKETS_DLL "" CACHE FILEPATH "Path to libwebsockets DLL")
+
 add_library(sl-browser-plugin MODULE)
 
 target_sources(
   sl-browser-plugin
   PRIVATE sl-browser-plugin.cpp
     GrpcPlugin.cpp
+    PluginJsHandler.h
+    PluginJsHandler.cpp
+    WebSocketServer.h
+    WebSocketServer.cpp
     ${papi_proto_srcs}
     ${papi_grpc_srcs})
 
 target_link_libraries(sl-browser-plugin PRIVATE Qt::Widgets)
 target_link_libraries(sl-browser-plugin PRIVATE Qt::Core)
 target_link_libraries(sl-browser-plugin PRIVATE Qt::Gui)
+target_link_libraries(sl-browser-plugin PRIVATE ${LIBWEBSOCKETS_LIB})
 
+target_include_directories(sl-browser-plugin PRIVATE ${LIBWEBSOCKETS_INCLUDE})
 target_include_directories(sl-browser-plugin PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/deps")
 target_include_directories(sl-browser-plugin PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../obs-browser/panel/")
 
@@ -136,6 +144,11 @@ target_link_options(sl-browser-plugin PRIVATE
 
 target_compile_options(sl-browser-plugin PRIVATE $<IF:$<CONFIG:DEBUG>,/MTd,/MT>)
 target_compile_definitions(sl-browser-plugin PRIVATE NOMINMAX)
+
+add_custom_command(TARGET sl-browser-plugin POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${LIBWEBSOCKETS_DLL}
+        $<TARGET_FILE_DIR:sl-browser-plugin>)
 
 ## -- Helper proxy children
 

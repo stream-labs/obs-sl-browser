@@ -1,4 +1,6 @@
 #include "GrpcPlugin.h"
+#include "JavascriptApi.h"
+#include "PluginJsHandler.h"
 
 #include <filesystem>
 
@@ -9,10 +11,10 @@
 
 class grpc_plugin_objImpl final : public grpc_plugin_obj::Service
 {
-	grpc::Status com_grpc_dispatcher(grpc::ServerContext *context, const grpc_example_Request *request, grpc_example_Reply *response) override
+	grpc::Status com_grpc_js_api(grpc::ServerContext *context, const grpc_js_api_Request *request,
+				     grpc_js_api_Reply *response) override
 	{
-		printf("GrpcPlugin client got %d\n", request->param1());
-		response->set_param1(12345);
+		PluginJsHandler::instance().pushApiRequest(request->funcname(), request->params());
 		return grpc::Status::OK;
 	}
 };
@@ -22,35 +24,26 @@ class grpc_plugin_objImpl final : public grpc_plugin_obj::Service
 * Sending messages to the proxy
 */
 
-class grpc_plugin_objClient {
-public:
-	grpc_plugin_objClient(std::shared_ptr<grpc::Channel> channel) :
-		stub_(grpc_proxy_obj::NewStub(channel))
-	{
-		m_connected = channel->WaitForConnected(std::chrono::system_clock::now() + std::chrono::seconds(3));
-	}
+grpc_plugin_objClient::grpc_plugin_objClient(std::shared_ptr<grpc::Channel> channel) :
+	stub_(grpc_proxy_obj::NewStub(channel))
+{
+	m_connected = channel->WaitForConnected(std::chrono::system_clock::now() + std::chrono::seconds(3));
+}
 
-	bool do_grpc_example_Request(int param1)
-	{
-		grpc_example_Request request;
-		request.set_param1(param1);
+bool grpc_plugin_objClient::send_executeCallback(const int functionId)
+{
+	grpc_js_api_ExecuteCallback request;
+	request.set_funcid(functionId);
 
-		grpc_example_Reply reply;
-		grpc::ClientContext context;
-		grpc::Status status = stub_->com_grpc_dispatcher(&context, request, &reply);
+	grpc_js_api_Reply reply;
+	grpc::ClientContext context;
+	grpc::Status status = stub_->com_grpc_executeCallback(&context, request, &reply);
 
-		if (!status.ok())
-			return m_connected = false;
+	if (!status.ok())
+		return m_connected = false;
 
-		printf("Got back %lld\n", reply.param1());
-		return true;
-	}
-
-	std::atomic<bool> m_connected{false};
-
-private:
-	std::unique_ptr<grpc_proxy_obj::Stub> stub_;
-};
+	return true;
+}
 
 // Grpc
 //

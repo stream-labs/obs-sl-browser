@@ -80,7 +80,8 @@ static void BrowserInit()
 
 	CefString(&settings.browser_subprocess_path) = path.c_str();
 
-	//printf("%s\n", settings.cache_path.str);
+	CefString(&settings.log_file) = "C:/Users/srogers/Desktop/cef.log";
+	settings.log_severity = LOGSEVERITY_DEBUG;
 
 	app = new BrowserApp();
 
@@ -110,22 +111,21 @@ static void BrowserManagerThread(void)
 
 QWidget* widget = nullptr;
 CefRefPtr<CefBrowser> browser = nullptr;
+CefRefPtr<BrowserClient> browserClient = nullptr;
 
-// Define a function.
 void MyFunc(int arg)
 {
 	// Create CEF Browser
 	CefWindowInfo window_info;
 	CefBrowserSettings browser_settings;
-	CefRefPtr<BrowserClient> browserClient = new BrowserClient(true, false);
+	browserClient = new BrowserClient(false);
+
 	CefString url = "C:/Users/srogers/Desktop/index.html";
 
 	// Now set the parent of the CEF browser to the QWidget
-	window_info.SetAsChild((HWND)widget->winId(),
-			       CefRect(0, 0, widget->width(), widget->height()));
+	window_info.SetAsChild((HWND)widget->winId(), CefRect(0, 0, widget->width(), widget->height()));
 
-	browser = CefBrowserHost::CreateBrowserSync(
-		window_info, browserClient.get(), url, browser_settings,
+	browser = CefBrowserHost::CreateBrowserSync(window_info, browserClient.get(), url, browser_settings,
 		CefRefPtr<CefDictionaryValue>(), nullptr);
 }
 

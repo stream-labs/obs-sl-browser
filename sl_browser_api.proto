@@ -19,6 +19,7 @@ message grpc_js_api_Request {
 // Client->
 message grpc_js_api_ExecuteCallback {
 	int32 funcid = 1;
+	string jsonstr = 2;
 }
 
 // Server->

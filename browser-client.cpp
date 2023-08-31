@@ -58,7 +58,7 @@ CefRefPtr<CefContextMenuHandler> BrowserClient::GetContextMenuHandler()
 
 CefRefPtr<CefAudioHandler> BrowserClient::GetAudioHandler()
 {
-	return reroute_audio ? this : nullptr;
+	return m_reroute_audio ? this : nullptr;
 }
 
 #if CHROME_VERSION_BUILD >= 4638
@@ -166,16 +166,38 @@ std::string BrowserClient::cefListValueToJSONString(CefRefPtr<CefListValue> list
 	return json_str;
 }
 
-bool BrowserClient::OnProcessMessageReceived(
-	CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame>, CefProcessId,
+void BrowserClient::RegisterCallback(const int functionId, CefRefPtr<CefBrowser> browser)
+{
+	std::lock_guard<std::recursive_mutex> grd(m_recursiveMutex);
+	m_callbackDictionary[functionId] = browser;
+}
+
+CefRefPtr<CefBrowser> BrowserClient::PopCallback(const int functionId)
+{
+	std::lock_guard<std::recursive_mutex> grd(m_recursiveMutex);
+
+	auto itr = m_callbackDictionary.find(functionId);
+
+	if (itr != m_callbackDictionary.end())
+	{
+		CefRefPtr<CefBrowser> browser = itr->second;
+		m_callbackDictionary.erase(itr);
+		return browser;
+	}
+
+	return nullptr;
+}
+
+bool BrowserClient::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame>, CefProcessId processId,
 	CefRefPtr<CefProcessMessage> message)
 {
 	const std::string &name = message->GetName();
 	CefRefPtr<CefListValue> input_args = message->GetArgumentList();
 	
-	if (!valid()) {
+	if (!valid())
 		return false;
-	}
+
+	RegisterCallback(input_args->GetInt(0), browser);
 
 	if (!GrpcProxy::instance().getClient()->send_js_api(name, cefListValueToJSONString(input_args)))
 	{
@@ -232,10 +254,10 @@ void BrowserClient::OnAudioStreamStarted(CefRefPtr<CefBrowser> browser,
 					 const CefAudioParameters &params_,
 					 int channels_)
 {
-	channels = channels_;
-	channel_layout = (ChannelLayout)params_.channel_layout;
-	sample_rate = params_.sample_rate;
-	frames_per_buffer = params_.frames_per_buffer;
+	m_channels = channels_;
+	m_channel_layout = (ChannelLayout)params_.channel_layout;
+	m_sample_rate = params_.sample_rate;
+	m_frames_per_buffer = params_.frames_per_buffer;
 }
 
 void BrowserClient::OnAudioStreamPacket(CefRefPtr<CefBrowser> browser,

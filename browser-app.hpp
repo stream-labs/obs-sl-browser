@@ -21,6 +21,8 @@
 #include <map>
 #include <unordered_map>
 #include <functional>
+#include <mutex>
+
 #include "cef-headers.hpp"
 
 typedef std::function<void(CefRefPtr<CefBrowser>)> BrowserFunc;
@@ -30,8 +32,9 @@ class BrowserApp : public CefApp,
 		   public CefBrowserProcessHandler,
 		   public CefV8Handler {
 
-	std::atomic<int> m_callbackIdCounter = 0;
-	std::map<int, CefRefPtr<CefV8Value>> m_callbackMap;
+	int m_callbackIdCounter = 0;
+	std::map<int, std::pair<CefRefPtr<CefV8Value>, CefRefPtr<CefV8Context>>> m_callbackMap;
+	std::recursive_mutex m_callbackMutex;
 
 public:
 	inline BrowserApp() {}

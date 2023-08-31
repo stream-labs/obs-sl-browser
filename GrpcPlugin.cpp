@@ -30,14 +30,15 @@ grpc_plugin_objClient::grpc_plugin_objClient(std::shared_ptr<grpc::Channel> chan
 	m_connected = channel->WaitForConnected(std::chrono::system_clock::now() + std::chrono::seconds(3));
 }
 
-bool grpc_plugin_objClient::send_executeCallback(const int functionId)
+bool grpc_plugin_objClient::send_executeCallback(const int functionId, const std::string &jsonStr)
 {
 	grpc_js_api_ExecuteCallback request;
 	request.set_funcid(functionId);
+	request.set_jsonstr(jsonStr.c_str());
 
 	grpc_js_api_Reply reply;
 	grpc::ClientContext context;
-	grpc::Status status = stub_->com_grpc_executeCallback(&context, request, &reply);
+	grpc::Status status = stub_->com_grpc_js_executeCallback(&context, request, &reply);
 
 	if (!status.ok())
 		return m_connected = false;

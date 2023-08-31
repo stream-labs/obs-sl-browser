@@ -92,6 +92,26 @@ bool BrowserApp::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser,
 					  CefProcessId source_process,
 					  CefRefPtr<CefProcessMessage> message)
 {
+	if (message->GetName() == "executeCallback")
+	{
+		CefRefPtr<CefListValue> arguments = message->GetArgumentList();
+		int callbackID = arguments->GetInt(0);
+		CefString jsonString = arguments->GetString(1);
+
+		std::lock_guard<std::recursive_mutex> grd(m_callbackMutex);
+
+		if (CefRefPtr<CefV8Value> callback = m_callbackMap[callbackID].first)
+		{
+			CefRefPtr<CefV8Context> context = m_callbackMap[callbackID].second;
+
+			CefV8ValueList args;
+			args.push_back(CefV8Value::CreateString(jsonString));
+			callback->ExecuteFunctionWithContext(context, nullptr, args);
+
+			m_callbackMap.erase(callbackID);
+		}
+	}
+
 	return true;
 }
 
@@ -100,12 +120,13 @@ bool BrowserApp::Execute(const CefString &name, CefRefPtr<CefV8Value>,
 			 CefRefPtr<CefV8Value> &, CefString &)
 {
 	if (JavascriptApi::isValidFunctionName(name.ToString())) {
-
+				
 		int callBackId = 0;
 
 		if (arguments.size() >= 1 && arguments[0]->IsFunction()) {
+			std::lock_guard<std::recursive_mutex> grd(m_callbackMutex);
 			callBackId = ++m_callbackIdCounter;
-			m_callbackMap[callBackId] = arguments[0];
+			m_callbackMap[callBackId] = { arguments[0], CefV8Context::GetCurrentContext() };
 		}
 
 		CefRefPtr<CefProcessMessage> msg = CefProcessMessage::Create(name);
@@ -137,6 +158,12 @@ bool BrowserApp::Execute(const CefString &name, CefRefPtr<CefV8Value>,
 		/* Function does not exist. */
 		return false;
 	}
+
+	AllocConsole();
+	freopen("conin$", "r", stdin);
+	freopen("conout$", "w", stdout);
+	freopen("conout$", "w", stderr);
+	printf("Debugging Window:\n");
 
 	return true;
 }

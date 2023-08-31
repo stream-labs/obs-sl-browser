@@ -116,6 +116,8 @@ target_sources(
     PluginJsHandler.cpp
     WebSocketServer.h
     WebSocketServer.cpp
+    deps/json11/json11.cpp
+    deps/json11/json11.hpp
     ${papi_proto_srcs}
     ${papi_grpc_srcs})
 

@@ -1,16 +1,32 @@
 #include "GrpcProxy.h"
+#include "browser-client.hpp"
 
 #include <filesystem>
 
-/***
+extern CefRefPtr<BrowserClient> browserClient;
+
+	/***
 * Server
 * Receiving messages from the plugin
 */
 
-class grpc_proxy_objImpl final : public grpc_proxy_obj::Service{
+class grpc_proxy_objImpl final : public grpc_proxy_obj::Service {
 	grpc::Status com_grpc_js_executeCallback(grpc::ServerContext *context, const grpc_js_api_ExecuteCallback *request,
-				     grpc_js_api_Reply *response) override
+						 grpc_js_api_Reply *response) override
 	{
+		CefRefPtr<CefProcessMessage> msg = CefProcessMessage::Create("executeCallback");
+		CefRefPtr<CefListValue> execute_args = msg->GetArgumentList();
+		execute_args->SetInt(0, request->funcid());
+		execute_args->SetString(1, request->jsonstr());
+
+		if (auto ptr = browserClient->PopCallback(request->funcid())) {
+			SendBrowserProcessMessage(ptr, PID_RENDERER, msg);
+		}
+		else {
+			printf("com_grpc_js_executeCallback failed to find browser for function");
+		}
+			
+
 		return grpc::Status::OK;
 	}
 };

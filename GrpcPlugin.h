@@ -13,7 +13,7 @@ class grpc_plugin_objClient
 public:
 	grpc_plugin_objClient(std::shared_ptr<grpc::Channel> channel);
 
-	bool send_executeCallback(const int functionId);
+	bool send_executeCallback(const int functionId, const std::string& jsonStr);
 
 private:
 	std::atomic<bool> m_connected{false};

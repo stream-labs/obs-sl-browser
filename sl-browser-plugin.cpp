@@ -8,14 +8,9 @@
 #include <string>
 #include <filesystem>
 
-#include <QMainWindow>
-#include <QDockWidget>
-
 #include "GrpcPlugin.h"
 #include "PluginJsHandler.h"
 #include "WebSocketServer.h"
-
-#include "C:\github\obs-studio\UI\window-dock-browser.hpp"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE("sl-browser-plugin", "en-US")

@@ -24,6 +24,7 @@ public:
 private:
 	void workerThread();
 
+	void JS_QUERY_PANEL_UIDS(const json11::Json &params, std::string &out_jsonReturn);
 	void JS_PANEL_EXECUTEJAVASCRIPT(const json11::Json &params, std::string &out_jsonReturn);
 	void JS_PANEL_SETURL(const json11::Json &params, std::string &out_jsonReturn);
 

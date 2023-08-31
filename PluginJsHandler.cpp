@@ -52,16 +52,17 @@ void PluginJsHandler::executeApiRequest(const std::string& funcName, const std::
 
 	std::string jsonReturnStr;
 
-	switch (JavascriptApi::getFunctionId(funcName))
-	{
-	case JavascriptApi::JS_PANEL_EXECUTEJAVASCRIPT:
-	{
+	switch (JavascriptApi::getFunctionId(funcName)) {
+	case JavascriptApi::JS_PANEL_EXECUTEJAVASCRIPT: {
 		JS_PANEL_EXECUTEJAVASCRIPT(jsonParams, jsonReturnStr);
 		break;
 	}
-	case JavascriptApi::JS_PANEL_SETURL:
-	{
+	case JavascriptApi::JS_PANEL_SETURL: {
 		JS_PANEL_SETURL(jsonParams, jsonReturnStr);
+		break;
+	}
+	case JavascriptApi::JS_QUERY_PANEL_UIDS: {
+		JS_QUERY_PANEL_UIDS(jsonParams, jsonReturnStr);
 		break;
 	}
 	}
@@ -95,38 +96,99 @@ void PluginJsHandler::workerThread()
 	}
 }
 
+void PluginJsHandler::JS_QUERY_PANEL_UIDS(const json11::Json &params, std::string &out_jsonReturn)
+{
+	blog(LOG_WARNING, "JS_QUERY_PANEL_UIDS start: %s\n", params.dump().c_str());
+
+	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
+
+	// This code is executed in the context of the QMainWindow's thread.
+	QMetaObject::invokeMethod(
+		mainWindow,
+		[mainWindow, &out_jsonReturn]() {
+
+			std::vector<json11::Json> panelUids;
+
+			QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
+			foreach(QDockWidget * dock, docks)
+			{
+				if (dock->property("uuid").isValid()) {
+					BrowserDock *ptr = (BrowserDock *)dock;
+					panelUids.push_back(dock->property("uuid").toString().toStdString());
+				}
+			}
+
+			json11::Json ret = json11::Json::object({{"result", json11::Json::array(panelUids)}});
+			out_jsonReturn = ret.dump();
+		},
+		Qt::BlockingQueuedConnection);
+
+	blog(LOG_WARNING, "JS_QUERY_PANEL_UIDS output: %s\n", out_jsonReturn.c_str());
+}
+
 void PluginJsHandler::JS_PANEL_EXECUTEJAVASCRIPT(const json11::Json &params, std::string &out_jsonReturn)
 {
-	printf("JS_PANEL_EXECUTEJAVASCRIPT: %s\n", params.dump().c_str());
+	blog(LOG_WARNING, "JS_PANEL_EXECUTEJAVASCRIPT: %s\n", params.dump().c_str());
+
+	const auto &param2Value = params["param2"];
+	const auto &param3Value = params["param3"];
+
+	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
+
+	// This code is executed in the context of the QMainWindow's thread.
+	QMetaObject::invokeMethod(
+		mainWindow,
+		[mainWindow, param2Value, param3Value, &out_jsonReturn]() {
+			QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
+			foreach(QDockWidget * dock, docks)
+			{
+				if (dock->property("uuid").isValid() &&
+				    dock->property("uuid").toString().toStdString() == param3Value.string_value()) {
+					BrowserDock *ptr = (BrowserDock *)dock;
+					ptr->cefWidget->executeJavaScript(param2Value.string_value().c_str());
+					return;
+				}
+			}
+
+			std::string errorMsg = "Dock '" + param2Value.string_value() + "' not found.";
+			json11::Json ret = json11::Json::object({{"error", errorMsg}});
+			out_jsonReturn = ret.dump();
+		},
+		Qt::BlockingQueuedConnection);
+
+	blog(LOG_WARNING, "JS_PANEL_EXECUTEJAVASCRIPT output: %s\n", out_jsonReturn.c_str());
 }
 
 void PluginJsHandler::JS_PANEL_SETURL(const json11::Json &params, std::string &out_jsonReturn)
 {
-	printf("JS_PANEL_SETURL: %s\n", params.dump().c_str());
+	blog(LOG_WARNING, "JS_PANEL_SETURL: %s\n", params.dump().c_str());
+
+	const auto &param2Value = params["param2"];
+	const auto &param3Value = params["param3"];
 
 	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
 
-	// Execute this lambda in the context of the main GUI thread.
-	QMetaObject::invokeMethod(
-		mainWindow,
-		[mainWindow]() {
-			// This code is executed in the context of the QMainWindow's thread.
-
-			// For example:
+	// This code is executed in the context of the QMainWindow's thread.
+	QMetaObject::invokeMethod(mainWindow,
+		[mainWindow, param2Value, param3Value, &out_jsonReturn]() {
+			
 			QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
 			foreach(QDockWidget * dock, docks)
 			{
-				if (dock->property("uuid").isValid())
+				if (dock->property("uuid").isValid() &&
+				    dock->property("uuid").toString().toStdString() == param3Value.string_value())
 				{
-					printf("Dock with objectName: %s has a uuid property.\n", dock->objectName().toStdString().c_str());
 					BrowserDock *ptr = (BrowserDock *)dock;
-					ptr->cefWidget->setURL("streamlabs.com");
+					ptr->cefWidget->setURL(param2Value.string_value().c_str());
+					return;
 				}
 			}
 
-			// Or add a dock widget
-			// QDockWidget *newDock = new QDockWidget();
-			// mainWindow->addDockWidget(Qt::LeftDockWidgetArea, newDock);
+			std::string errorMsg = "Dock '" + param2Value.string_value() + "' not found.";
+			json11::Json ret = json11::Json::object({{"error", errorMsg}});
+			out_jsonReturn = ret.dump();
 		},
-		Qt::BlockingQueuedConnection); // BlockingQueuedConnection waits until the slot (in this case, the lambda) has been executed.
+		Qt::BlockingQueuedConnection);
+
+	blog(LOG_WARNING, "JS_PANEL_SETURL output: %s\n", out_jsonReturn.c_str());
 }

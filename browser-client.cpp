@@ -206,13 +206,6 @@ bool BrowserClient::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefR
 		return false;
 	}
 
-	// Sends back to the render proxy process
-	//CefRefPtr<CefProcessMessage> msg = CefProcessMessage::Create("executeCallback");
-	//CefRefPtr<CefListValue> execute_args = msg->GetArgumentList();
-	//execute_args->SetInt(0, input_args->GetInt(0));
-	//execute_args->SetString(1, "{}");
-	//SendBrowserProcessMessage(browser, PID_RENDERER, msg);
-
 	return true;
 }
 

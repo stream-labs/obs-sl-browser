@@ -116,11 +116,14 @@ target_sources(
     PluginJsHandler.cpp
     WebSocketServer.h
     WebSocketServer.cpp
+    BrowserDockCaster.h
+    BrowserDockCaster.cpp
     deps/json11/json11.cpp
     deps/json11/json11.hpp
     ${papi_proto_srcs}
     ${papi_grpc_srcs})
-
+    
+target_link_libraries(sl-browser-plugin PRIVATE CEF::Wrapper CEF::Library)
 target_link_libraries(sl-browser-plugin PRIVATE Qt::Widgets)
 target_link_libraries(sl-browser-plugin PRIVATE Qt::Core)
 target_link_libraries(sl-browser-plugin PRIVATE Qt::Gui)

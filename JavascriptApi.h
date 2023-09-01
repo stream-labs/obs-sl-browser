@@ -10,7 +10,8 @@ public:
 		JS_INVALID = 0,
 		JS_PANEL_EXECUTEJAVASCRIPT ,
 		JS_PANEL_SETURL,
-		JS_QUERY_PANEL_UIDS,
+		JS_QUERY_PANELS,
+		JS_DOWNLOAD_ZIP,
 	};
 public:
 	static std::map<std::string, JSFuncs> &getGlobalFunctionNames()
@@ -19,14 +20,17 @@ public:
 		static std::map<std::string, JSFuncs> names =
 		{
 			// .(@function(arg1))
-			//	Example arg1 = {"result": ["1f67699e49444d3c9914b9c037aac3c7"]}
-			{"query_panel_uids", JS_QUERY_PANEL_UIDS},
+			//	Example arg1 = [{ uuid: "asdasdasd", url: "..." },]
+			{"query_panels", JS_QUERY_PANELS},
 
 			// .(@paneluid, @url)
 			{"panel_setURL", JS_PANEL_SETURL},
 
 			// .(@paneluid, @jsString)
 			{"panel_executeJavascript", JS_PANEL_EXECUTEJAVASCRIPT},
+
+			// .(@url)
+			{"panel_setURL", JS_DOWNLOAD_ZIP},
 		};
 
 		return names;

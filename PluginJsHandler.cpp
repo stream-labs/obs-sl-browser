@@ -1,6 +1,7 @@
 #include "PluginJsHandler.h"
 #include "JavascriptApi.h"
 #include "GrpcPlugin.h"
+#include "BrowserDockCaster.h"
 
 #include <chrono>
 #include <obs.h>
@@ -9,7 +10,9 @@
 #include <QMainWindow>
 #include <QDockWidget>
 
-#include "C:\github\obs-studio\UI\window-dock-browser.hpp"
+#include "../obs-browser/panel/browser-panel-internal.hpp"
+
+#include "cef-headers.hpp"
 
 void PluginJsHandler::start()
 {
@@ -61,8 +64,8 @@ void PluginJsHandler::executeApiRequest(const std::string& funcName, const std::
 		JS_PANEL_SETURL(jsonParams, jsonReturnStr);
 		break;
 	}
-	case JavascriptApi::JS_QUERY_PANEL_UIDS: {
-		JS_QUERY_PANEL_UIDS(jsonParams, jsonReturnStr);
+	case JavascriptApi::JS_QUERY_PANELS: {
+		JS_QUERY_PANELS(jsonParams, jsonReturnStr);
 		break;
 	}
 	}
@@ -96,34 +99,41 @@ void PluginJsHandler::workerThread()
 	}
 }
 
-void PluginJsHandler::JS_QUERY_PANEL_UIDS(const json11::Json &params, std::string &out_jsonReturn)
+void PluginJsHandler::JS_QUERY_PANELS(const json11::Json &params, std::string &out_jsonReturn)
 {
-	blog(LOG_WARNING, "JS_QUERY_PANEL_UIDS start: %s\n", params.dump().c_str());
+	blog(LOG_WARNING, "JS_QUERY_PANELS start: %s\n", params.dump().c_str());
 
 	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
 
-	// This code is executed in the context of the QMainWindow's thread.
 	QMetaObject::invokeMethod(
 		mainWindow,
 		[mainWindow, &out_jsonReturn]() {
-
-			std::vector<json11::Json> panelUids;
+			std::vector<json11::Json> panelInfo;
 
 			QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
 			foreach(QDockWidget * dock, docks)
 			{
 				if (dock->property("uuid").isValid()) {
-					BrowserDock *ptr = (BrowserDock *)dock;
-					panelUids.push_back(dock->property("uuid").toString().toStdString());
+					QCefWidgetInternal *widget = (QCefWidgetInternal *)BrowserDockCaster::getQCefWidget(dock);
+
+					if (widget->cefBrowser != nullptr) {
+						std::string uuid = dock->property("uuid").toString().toStdString();
+						std::string url = widget->cefBrowser->GetMainFrame()->GetURL();
+
+						// Create a json11::Json object for this dock widget and add it to the panelInfo vector
+						panelInfo.push_back(json11::Json::object{{"uuid", uuid}, {"url", url}});
+					}
 				}
 			}
 
-			json11::Json ret = json11::Json::object({{"result", json11::Json::array(panelUids)}});
+			// Convert the panelInfo vector to a json11::Json object and dump string
+			json11::Json ret = panelInfo;
 			out_jsonReturn = ret.dump();
 		},
 		Qt::BlockingQueuedConnection);
 
-	blog(LOG_WARNING, "JS_QUERY_PANEL_UIDS output: %s\n", out_jsonReturn.c_str());
+
+	blog(LOG_WARNING, "JS_QUERY_PANELS output: %s\n", out_jsonReturn.c_str());
 }
 
 void PluginJsHandler::JS_PANEL_EXECUTEJAVASCRIPT(const json11::Json &params, std::string &out_jsonReturn)
@@ -144,8 +154,8 @@ void PluginJsHandler::JS_PANEL_EXECUTEJAVASCRIPT(const json11::Json &params, std
 			{
 				if (dock->property("uuid").isValid() &&
 				    dock->property("uuid").toString().toStdString() == param3Value.string_value()) {
-					BrowserDock *ptr = (BrowserDock *)dock;
-					ptr->cefWidget->executeJavaScript(param2Value.string_value().c_str());
+					QCefWidgetInternal *widcket = (QCefWidgetInternal *)BrowserDockCaster::getQCefWidget(dock);
+					widcket->executeJavaScript(param2Value.string_value().c_str());
 					return;
 				}
 			}
@@ -178,8 +188,8 @@ void PluginJsHandler::JS_PANEL_SETURL(const json11::Json &params, std::string &o
 				if (dock->property("uuid").isValid() &&
 				    dock->property("uuid").toString().toStdString() == param3Value.string_value())
 				{
-					BrowserDock *ptr = (BrowserDock *)dock;
-					ptr->cefWidget->setURL(param2Value.string_value().c_str());
+					QCefWidgetInternal *widcket = (QCefWidgetInternal *)BrowserDockCaster::getQCefWidget(dock);
+					widcket->setURL(param2Value.string_value().c_str());
 					return;
 				}
 			}

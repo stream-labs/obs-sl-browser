@@ -163,7 +163,6 @@ bool BrowserApp::Execute(const CefString &name, CefRefPtr<CefV8Value>,
 	freopen("conin$", "r", stdin);
 	freopen("conout$", "w", stdout);
 	freopen("conout$", "w", stderr);
-	printf("Debugging Window:\n");
-
+	printf("BrowserApp Debugging Window:\n");
 	return true;
 }

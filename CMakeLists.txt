@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.16...3.25)
 
 find_package(CEF REQUIRED)
+find_package(ZLIB REQUIRED)
 find_qt(COMPONENTS Widgets)
 
 include(FindGRPC.cmake)
@@ -120,9 +121,16 @@ target_sources(
     BrowserDockCaster.cpp
     deps/json11/json11.cpp
     deps/json11/json11.hpp
+    deps/minizip/ioapi.c
+    deps/minizip/iowin32.c
+    deps/minizip/mztools.c
+    deps/minizip/unzip.c
+    deps/minizip/zip.c
     ${papi_proto_srcs}
-    ${papi_grpc_srcs})
+    ${papi_grpc_srcs}
+)
     
+target_link_libraries(sl-browser-plugin PRIVATE ZLIB::ZLIB)
 target_link_libraries(sl-browser-plugin PRIVATE CEF::Wrapper CEF::Library)
 target_link_libraries(sl-browser-plugin PRIVATE Qt::Widgets)
 target_link_libraries(sl-browser-plugin PRIVATE Qt::Core)
@@ -135,6 +143,7 @@ target_include_directories(sl-browser-plugin PRIVATE "${CMAKE_CURRENT_SOURCE_DIR
 
 target_compile_features(sl-browser-plugin PRIVATE cxx_std_17)
 target_link_libraries(sl-browser-plugin PRIVATE OBS::libobs OBS::frontend-api)
+target_link_libraries(sl-browser-plugin PRIVATE ZLIB::ZLIB)
 
 target_link_libraries(sl-browser-plugin PRIVATE
   papi_grpc_proto

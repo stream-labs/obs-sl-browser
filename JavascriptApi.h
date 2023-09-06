@@ -12,6 +12,7 @@ public:
 		JS_PANEL_SETURL,
 		JS_QUERY_PANELS,
 		JS_DOWNLOAD_ZIP,
+		JS_READ_FILE,
 	};
 public:
 	static std::map<std::string, JSFuncs> &getGlobalFunctionNames()
@@ -20,7 +21,7 @@ public:
 		static std::map<std::string, JSFuncs> names =
 		{
 			// .(@function(arg1))
-			//	Example arg1 = [{ uuid: "asdasdasd", url: "..." },]
+			//	Example arg1 = [{ uuid: "...", url: "..." },]
 			{"query_panels", JS_QUERY_PANELS},
 
 			// .(@paneluid, @url)
@@ -29,8 +30,16 @@ public:
 			// .(@paneluid, @jsString)
 			{"panel_executeJavascript", JS_PANEL_EXECUTEJAVASCRIPT},
 
-			// .(@url)
-			{"panel_setURL", JS_DOWNLOAD_ZIP},
+			// .(@function(arg1), @url)
+			// Downloads and unpacks the zip, returning a list of full file paths to the files that were in it
+			//	Example arg1 = [{ path: "..." },]
+			{"downloadZip", JS_DOWNLOAD_ZIP},
+
+			// .(@function(arg1), @filepath)
+			// Returns the contents of a file as a file. If the filesize is over 1mb this will return an error.
+			//	Example arg1 = { "contents": "..." }
+			{"readFile", JS_READ_FILE},
+
 		};
 
 		return names;

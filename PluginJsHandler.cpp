@@ -1,24 +1,43 @@
 #include "PluginJsHandler.h"
+
+// Local
 #include "JavascriptApi.h"
 #include "GrpcPlugin.h"
 #include "BrowserDockCaster.h"
 #include "cef-headers.hpp"
 #include "deps/minizip/unzip.h"
 
+// Windows
 #include <wininet.h>
-#include <chrono>
-#include <fstream>
 #include <ShlObj.h>
 
-#include <obs.h>
-#include <obs-frontend-api.h>
+// Stl
+#include <chrono>
+#include <fstream>
 
+// Obs
+#include <obs.h>
+#include <obs-data.h>
+#include <obs-frontend-api.h>
+#include "../obs-browser/panel/browser-panel-internal.hpp"
+
+// Qt
 #include <QMainWindow>
 #include <QDockWidget>
 
-#include "../obs-browser/panel/browser-panel-internal.hpp"
-
 #pragma comment(lib, "wininet.lib")
+
+using namespace json11;
+
+std::string PluginJsHandler::getDownloadsDir() const
+{
+	char path[MAX_PATH];
+
+	if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, 0, path)))
+		return std::string(path) + "\\StreamlabsOBS";
+
+	return "";
+}
 
 void PluginJsHandler::start()
 {
@@ -40,20 +59,30 @@ void PluginJsHandler::pushApiRequest(const std::string &funcName, const std::str
 	m_queudRequests.push_back({funcName, params});
 }
 
-std::string PluginJsHandler::getDownloadsDir() const
+void PluginJsHandler::workerThread()
 {
-	char path[MAX_PATH];
+	while (m_running) {
+		std::vector<std::pair<std::string, std::string>> latestBatch;
 
-	if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, path)))
-		return std::string(path) + "\\slabsdownloads";
+		{
+			std::lock_guard<std::mutex> grd(m_queueMtx);
+			latestBatch.swap(m_queudRequests);
+		}
 
-	return "";
+		if (latestBatch.empty()) {
+			using namespace std::chrono;
+			std::this_thread::sleep_for(1ms);
+		} else {
+			for (auto &itr : latestBatch)
+				executeApiRequest(itr.first, itr.second);
+		}
+	}
 }
 
 void PluginJsHandler::executeApiRequest(const std::string& funcName, const std::string& params)
 {
 	std::string err;
-	json11::Json jsonParams = json11::Json::parse(params, err);
+	Json jsonParams = Json::parse(params, err);
 
 	if (!err.empty())
 	{
@@ -92,6 +121,18 @@ void PluginJsHandler::executeApiRequest(const std::string& funcName, const std::
 		JS_READ_FILE(jsonParams, jsonReturnStr);
 		break;
 	}
+	case JavascriptApi::JS_DELETE_FILES: {
+		JS_DELETE_FILES(jsonParams, jsonReturnStr);
+		break;
+	}
+	case JavascriptApi::JS_DROP_FOLDER: {
+		JS_DROP_FOLDER(jsonParams, jsonReturnStr);
+		break;
+	}
+	case JavascriptApi::JS_QUERY_DOWNLOADS_FOLDER: {
+		JS_QUERY_DOWNLOADS_FOLDER(jsonParams, jsonReturnStr);
+		break;
+	}
 	}
 
 	// We're done, send callback
@@ -99,31 +140,7 @@ void PluginJsHandler::executeApiRequest(const std::string& funcName, const std::
 		GrpcPlugin::instance().getClient()->send_executeCallback(param1Value.int_value(), jsonReturnStr);
 }
 
-void PluginJsHandler::workerThread()
-{
-	while (m_running)
-	{
-		std::vector<std::pair<std::string, std::string>> latestBatch;
-
-		{
-			std::lock_guard<std::mutex> grd(m_queueMtx);
-			latestBatch.swap(m_queudRequests);
-		}
-
-		if (latestBatch.empty())
-		{
-			using namespace std::chrono;
-			std::this_thread::sleep_for(1ms);
-		}
-		else
-		{
-			for (auto &itr : latestBatch)
-				executeApiRequest(itr.first, itr.second);
-		}
-	}
-}
-
-void PluginJsHandler::JS_QUERY_PANELS(const json11::Json &params, std::string &out_jsonReturn)
+void PluginJsHandler::JS_QUERY_PANELS(const Json &params, std::string &out_jsonReturn)
 {
 	blog(LOG_WARNING, "JS_QUERY_PANELS start: %s\n", params.dump().c_str());
 
@@ -132,7 +149,7 @@ void PluginJsHandler::JS_QUERY_PANELS(const json11::Json &params, std::string &o
 	QMetaObject::invokeMethod(
 		mainWindow,
 		[mainWindow, &out_jsonReturn]() {
-			std::vector<json11::Json> panelInfo;
+			std::vector<Json> panelInfo;
 
 			QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
 			foreach(QDockWidget * dock, docks)
@@ -144,14 +161,14 @@ void PluginJsHandler::JS_QUERY_PANELS(const json11::Json &params, std::string &o
 						std::string uuid = dock->property("uuid").toString().toStdString();
 						std::string url = widget->cefBrowser->GetMainFrame()->GetURL();
 
-						// Create a json11::Json object for this dock widget and add it to the panelInfo vector
-						panelInfo.push_back(json11::Json::object{{"uuid", uuid}, {"url", url}});
+						// Create a Json object for this dock widget and add it to the panelInfo vector
+						panelInfo.push_back(Json::object{{"uuid", uuid}, {"url", url}});
 					}
 				}
 			}
 
-			// Convert the panelInfo vector to a json11::Json object and dump string
-			json11::Json ret = panelInfo;
+			// Convert the panelInfo vector to a Json object and dump string
+			Json ret = panelInfo;
 			out_jsonReturn = ret.dump();
 		},
 		Qt::BlockingQueuedConnection);
@@ -160,7 +177,7 @@ void PluginJsHandler::JS_QUERY_PANELS(const json11::Json &params, std::string &o
 	blog(LOG_WARNING, "JS_QUERY_PANELS output: %s\n", out_jsonReturn.c_str());
 }
 
-void PluginJsHandler::JS_PANEL_EXECUTEJAVASCRIPT(const json11::Json &params, std::string &out_jsonReturn)
+void PluginJsHandler::JS_PANEL_EXECUTEJAVASCRIPT(const Json &params, std::string &out_jsonReturn)
 {
 	blog(LOG_WARNING, "JS_PANEL_EXECUTEJAVASCRIPT: %s\n", params.dump().c_str());
 
@@ -185,7 +202,7 @@ void PluginJsHandler::JS_PANEL_EXECUTEJAVASCRIPT(const json11::Json &params, std
 			}
 
 			std::string errorMsg = "Dock '" + param2Value.string_value() + "' not found.";
-			json11::Json ret = json11::Json::object({{"error", errorMsg}});
+			Json ret = Json::object({{"error", errorMsg}});
 			out_jsonReturn = ret.dump();
 		},
 		Qt::BlockingQueuedConnection);
@@ -193,7 +210,7 @@ void PluginJsHandler::JS_PANEL_EXECUTEJAVASCRIPT(const json11::Json &params, std
 	blog(LOG_WARNING, "JS_PANEL_EXECUTEJAVASCRIPT output: %s\n", out_jsonReturn.c_str());
 }
 
-void PluginJsHandler::JS_PANEL_SETURL(const json11::Json &params, std::string &out_jsonReturn)
+void PluginJsHandler::JS_PANEL_SETURL(const Json &params, std::string &out_jsonReturn)
 {
 	blog(LOG_WARNING, "JS_PANEL_SETURL: %s\n", params.dump().c_str());
 
@@ -219,7 +236,7 @@ void PluginJsHandler::JS_PANEL_SETURL(const json11::Json &params, std::string &o
 			}
 
 			std::string errorMsg = "Dock '" + param2Value.string_value() + "' not found.";
-			json11::Json ret = json11::Json::object({{"error", errorMsg}});
+			Json ret = Json::object({{"error", errorMsg}});
 			out_jsonReturn = ret.dump();
 		},
 		Qt::BlockingQueuedConnection);
@@ -227,7 +244,7 @@ void PluginJsHandler::JS_PANEL_SETURL(const json11::Json &params, std::string &o
 	blog(LOG_WARNING, "JS_PANEL_SETURL output: %s\n", out_jsonReturn.c_str());
 }
 
-void PluginJsHandler::JS_DOWNLOAD_ZIP(const json11::Json &params, std::string &out_jsonReturn)
+void PluginJsHandler::JS_DOWNLOAD_ZIP(const Json &params, std::string &out_jsonReturn)
 {
 	auto downloadFile = [](const std::string &url, const std::string &filename)
 	{
@@ -402,20 +419,20 @@ void PluginJsHandler::JS_DOWNLOAD_ZIP(const json11::Json &params, std::string &o
 			unzip(zipFilepath, filepaths);
 
 			// Build json string now
-			json11::Json::array json_array;
+			Json::array json_array;
     
 			for (const auto& filepath : filepaths) {
-				json11::Json::object obj;
+				Json::object obj;
 				obj["path"] = filepath;
 				json_array.push_back(obj);
 			}
 
-			json11::Json json_object = json11::Json(json_array);
+			Json json_object = Json(json_array);
 			out_jsonReturn = json_object.dump();
 		}
 		else
 		{
-			json11::Json ret = json11::Json::object({{"error", "Http download file failed"}});
+			Json ret = Json::object({{"error", "Http download file failed"}});
 			out_jsonReturn = ret.dump();
 		}
 
@@ -424,14 +441,14 @@ void PluginJsHandler::JS_DOWNLOAD_ZIP(const json11::Json &params, std::string &o
 	}
 	else
 	{
-		json11::Json ret = json11::Json::object({{"error", "File system can't access Local AppData folder"}});
+		Json ret = Json::object({{"error", "File system can't access Local AppData folder"}});
 		out_jsonReturn = ret.dump();
 	}
 
 	blog(LOG_WARNING, "JS_DOWNLOAD_ZIP output: %s\n", out_jsonReturn.c_str());
 }
 
-void PluginJsHandler::JS_READ_FILE(const json11::Json &params, std::string &out_jsonReturn)
+void PluginJsHandler::JS_READ_FILE(const Json &params, std::string &out_jsonReturn)
 {
 	const auto &param2Value = params["param2"];
 
@@ -440,7 +457,7 @@ void PluginJsHandler::JS_READ_FILE(const json11::Json &params, std::string &out_
 
 	std::ifstream file(filepath, std::ios::binary | std::ios::ate);
 
-	json11::Json ret;
+	Json ret;
 
 	if (file) {
 		try {
@@ -451,21 +468,148 @@ void PluginJsHandler::JS_READ_FILE(const json11::Json &params, std::string &out_
 
 			// Check if file size is 1MB or higher
 			if (fileSize >= 1048576) {
-				ret = json11::Json::object({{"error", "File size is 1MB or higher"}});
+				ret = Json::object({{"error", "File size is 1MB or higher"}});
 			} else {
 				std::stringstream buffer;
 				buffer << file.rdbuf();
 				filecontents = buffer.str();
-				ret = json11::Json::object({{"contents", filecontents}});
+				ret = Json::object({{"contents", filecontents}});
 			}
 		} catch (...) {
-			ret = json11::Json::object(
+			ret = Json::object(
 				{{"error", "Unable to read file. Checking for windows errors: '" + std::to_string(GetLastError()) + "'"}});
 		}
 	} else {
-		ret = json11::Json::object(
+		ret = Json::object(
 			{{"error", "Unable to open file. Checking for windows errors: '" + std::to_string(GetLastError()) + "'"}});
 	}
 
 	out_jsonReturn = ret.dump();
 }
+
+void PluginJsHandler::JS_DELETE_FILES(const Json &params, std::string &out_jsonReturn)
+{
+	Json ret;
+	std::vector<std::string> errors;
+	std::vector<std::string> success;
+
+	const auto &param2Value = params["param2"];
+
+	std::string err;
+	Json jsonArray = Json::parse(params["param2"].string_value().c_str(), err);
+
+	if (!err.empty()) {
+		ret = Json::object({{"error", "Invalid parameter: " + err}});
+		out_jsonReturn = ret.dump();
+		return;
+	}
+
+	const auto &filepaths = jsonArray.array_items();
+
+	for (const auto &filepathJson : filepaths) {
+		if (filepathJson.is_object()) {
+			const auto &filepath = filepathJson["path"].string_value();
+
+			std::filesystem::path downloadsDir = std::filesystem::path(getDownloadsDir());
+			std::filesystem::path fullPath = downloadsDir / filepath;
+			std::filesystem::path normalizedPath = fullPath.lexically_normal();
+
+			// Check if filepath contains relative components that move outside the downloads directory
+			if (normalizedPath.string().find(downloadsDir.string()) != 0) {
+				errors.push_back("Invalid path: " + filepath);
+			} else {
+				try {
+					if (std::filesystem::exists(normalizedPath)) {
+						std::filesystem::remove(normalizedPath);
+						success.push_back(filepath);
+					} else {
+						errors.push_back("File not found: " + filepath);
+					}
+				} catch (const std::filesystem::filesystem_error &e) {
+					errors.push_back("Error deleting file '" + filepath + "': " + e.what());
+				}
+			}			
+		}
+	}
+
+	ret = Json::object({{"success", success}, {"errors", errors}});
+	out_jsonReturn = ret.dump();
+}
+
+void PluginJsHandler::JS_DROP_FOLDER(const Json &params, std::string &out_jsonReturn)
+{
+	const auto &filepath = params["param2"].string_value();
+
+	std::filesystem::path downloadsDir = std::filesystem::path(getDownloadsDir());
+	std::filesystem::path fullPath = downloadsDir / filepath;
+	std::filesystem::path normalizedPath = fullPath.lexically_normal();
+
+	// Check if filepath contains relative components that move outside the downloads directory
+	if (normalizedPath.string().find(downloadsDir.string()) != 0) {
+		Json ret = Json::object({{"error", "Invalid path: " + filepath}});
+		out_jsonReturn = ret.dump();
+	} else {
+		try {
+			std::filesystem::remove_all(normalizedPath);
+		} catch (const std::filesystem::filesystem_error &e) {
+			Json ret = Json::object({{"error", "Failed to delete '" + filepath + "': " + e.what()}});
+			out_jsonReturn = ret.dump();
+		}
+	}	
+}
+
+void PluginJsHandler::JS_QUERY_DOWNLOADS_FOLDER(const Json &params, std::string &out_jsonReturn)
+{
+	std::string downloadsFolderFullPath = getDownloadsDir();
+
+	std::vector<Json> pathsList;
+
+	try {
+		for (const auto &entry : std::filesystem::directory_iterator(downloadsFolderFullPath)) {
+			pathsList.push_back(entry.path().string());
+		}
+
+		Json ret = Json::array(pathsList);
+		out_jsonReturn = ret.dump();
+	} catch (const std::filesystem::filesystem_error &e) {
+		out_jsonReturn = Json(Json::object({{"error", "Failed to query downloads folder: " + std::string(e.what())}})).dump();
+	}
+}
+
+void PluginJsHandler::JS_OBS_SOURCE_CREATE(const Json &params, std::string &out_jsonReturn)
+{
+	const auto &id = params["param2"].string_value();
+	const auto &name = params["param3"].string_value();
+	const auto &settings_jsonStr = params["param4"].string_value();
+	const auto &hotkey_data_jsonStr = params["param5"].string_value();
+
+	obs_data_t *settings = obs_data_create_from_json(settings_jsonStr.c_str());
+	obs_data_t *hotkeys = obs_data_create_from_json(hotkey_data_jsonStr.c_str());
+
+	obs_data_release(hotkeys);
+	obs_data_release(settings);
+
+	obs_source_t *source = obs_source_create(id.c_str(), name.c_str(), settings, hotkeys);
+
+	if (!source) {
+		out_jsonReturn = Json(Json::object({{"error", "obs_source_create returned null"}})).dump();
+		return;
+	}
+
+	// todo; store refs
+	//uint64_t uid = osn::Source::Manager::GetInstance().find(source);
+	uint64_t uid = 0;
+
+	obs_data_t *settingsSource = obs_source_get_settings(source);
+
+	Json jsonReturnValue = Json::object({{"uid", Json(std::to_string(uid))},
+					     {"settings", Json(obs_data_get_json(settingsSource))},
+					     {"audio_mixers", Json(std::to_string(obs_source_get_audio_mixers(source)))},
+					     {"deinterlace_mode", Json(std::to_string(obs_source_get_deinterlace_mode(source)))},
+					     {"deinterlace_field_order", Json(std::to_string(obs_source_get_deinterlace_field_order(source)))}});
+	
+	out_jsonReturn = jsonReturnValue.dump();
+
+	obs_data_release(settingsSource);
+}
+

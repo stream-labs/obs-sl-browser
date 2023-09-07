@@ -29,6 +29,10 @@ private:
 	void JS_PANEL_SETURL(const json11::Json &params, std::string &out_jsonReturn);
 	void JS_DOWNLOAD_ZIP(const json11::Json &params, std::string &out_jsonReturn);
 	void JS_READ_FILE(const json11::Json &params, std::string &out_jsonReturn);
+	void JS_DELETE_FILES(const json11::Json &params, std::string &out_jsonReturn);
+	void JS_DROP_FOLDER(const json11::Json &params, std::string &out_jsonReturn);
+	void JS_QUERY_DOWNLOADS_FOLDER(const json11::Json &params, std::string &out_jsonReturn);
+	void JS_OBS_SOURCE_CREATE(const json11::Json &params, std::string &out_jsonReturn);
 
 	std::string getDownloadsDir() const;
 

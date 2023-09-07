@@ -17,11 +17,13 @@ public:
 		JS_DROP_FOLDER,
 		JS_QUERY_DOWNLOADS_FOLDER,
 		JS_OBS_SOURCE_CREATE,
+		JS_OBS_SOURCE_DESTROY,
 	};
 public:
 	static std::map<std::string, JSFuncs> &getGlobalFunctionNames()
 	{
 		// arg1 for any function can be a function that will notify when its done, if arg1 is not a function then it blocks
+		// Json strings that are sent back to you will either contain the expected data or {"error": "message"}
 		static std::map<std::string, JSFuncs> names =
 		{
 			/***
@@ -29,7 +31,7 @@ public:
 			*/
 
 			// .(@function(arg1))
-			//	Example arg1 = [{ "path": "...", "path": "..." },]
+			//	Example arg1 = [{ "path": "..." }, { "path": "..." }]
 			{"query_panels", JS_QUERY_PANELS},
 
 			// .(@paneluid, @url)
@@ -71,8 +73,13 @@ public:
 
 			// .(@function(arg1), id, name, settings_jsonStr, hotkey_data_jsonStr)
 			// Creates an obs source, also returns back some information about the source you just created if you want it
-			//	Example arg1 = { "uid": "...", "settings_jsonStr": "obs_data_get_full_json()", "audio_mixers": "obs_source_get_audio_mixers()", "deinterlace_mode": "obs_source_get_deinterlace_mode()", "deinterlace_field_order": "obs_source_get_deinterlace_field_order()" }
+			// Note that 'name' is also the guid of it, duplicates can't exist
+			//	Example arg1 = { "settings_jsonStr": "obs_data_get_full_json()", "audio_mixers": "obs_source_get_audio_mixers()", "deinterlace_mode": "obs_source_get_deinterlace_mode()", "deinterlace_field_order": "obs_source_get_deinterlace_field_order()" }
 			{"obs_source_create", JS_OBS_SOURCE_CREATE},
+
+			// .(@function(arg1), name)
+			// Destroys an obs source with the name provided if it exists
+			{"obs_source_destroy", JS_OBS_SOURCE_DESTROY},
 
 		};
 

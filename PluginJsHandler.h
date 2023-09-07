@@ -3,6 +3,7 @@
 #include <mutex>
 #include <thread>
 #include <vector>
+#include <obs.h>
 
 #include <json11/json11.hpp>
 
@@ -33,6 +34,7 @@ private:
 	void JS_DROP_FOLDER(const json11::Json &params, std::string &out_jsonReturn);
 	void JS_QUERY_DOWNLOADS_FOLDER(const json11::Json &params, std::string &out_jsonReturn);
 	void JS_OBS_SOURCE_CREATE(const json11::Json &params, std::string &out_jsonReturn);
+	void JS_OBS_SOURCE_DESTROY(const json11::Json &params, std::string &out_jsonReturn);
 
 	std::string getDownloadsDir() const;
 
@@ -40,4 +42,6 @@ private:
 	std::atomic<bool> m_running = false;
 	std::vector<std::pair<std::string, std::string>> m_queudRequests;
 	std::thread m_workerThread;
+
+	std::map<std::string, obs_source_t*> m_sources;
 };

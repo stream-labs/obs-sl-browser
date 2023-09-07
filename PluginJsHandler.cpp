@@ -16,8 +16,7 @@
 #include <fstream>
 
 // Obs
-#include <obs.h>
-#include <obs-data.h>
+#include <obs.hpp>
 #include <obs-frontend-api.h>
 #include "../obs-browser/panel/browser-panel-internal.hpp"
 
@@ -133,6 +132,14 @@ void PluginJsHandler::executeApiRequest(const std::string& funcName, const std::
 		JS_QUERY_DOWNLOADS_FOLDER(jsonParams, jsonReturnStr);
 		break;
 	}
+	case JavascriptApi::JS_OBS_SOURCE_CREATE: {
+		JS_OBS_SOURCE_CREATE(jsonParams, jsonReturnStr);
+		break;
+	}
+	case JavascriptApi::JS_OBS_SOURCE_DESTROY: {
+		JS_OBS_SOURCE_DESTROY(jsonParams, jsonReturnStr);
+		break;
+	}						     
 	}
 
 	// We're done, send callback
@@ -212,7 +219,7 @@ void PluginJsHandler::JS_PANEL_EXECUTEJAVASCRIPT(const Json &params, std::string
 
 void PluginJsHandler::JS_PANEL_SETURL(const Json &params, std::string &out_jsonReturn)
 {
-	blog(LOG_WARNING, "JS_PANEL_SETURL: %s\n", params.dump().c_str());
+	blog(LOG_INFO, "JS_PANEL_SETURL: %s\n", params.dump().c_str());
 
 	const auto &param2Value = params["param2"];
 	const auto &param3Value = params["param3"];
@@ -241,11 +248,13 @@ void PluginJsHandler::JS_PANEL_SETURL(const Json &params, std::string &out_jsonR
 		},
 		Qt::BlockingQueuedConnection);
 
-	blog(LOG_WARNING, "JS_PANEL_SETURL output: %s\n", out_jsonReturn.c_str());
+	blog(LOG_INFO, "JS_PANEL_SETURL output: %s\n", out_jsonReturn.c_str());
 }
 
 void PluginJsHandler::JS_DOWNLOAD_ZIP(const Json &params, std::string &out_jsonReturn)
 {
+	blog(LOG_INFO, "JS_DOWNLOAD_ZIP: %s\n", params.dump().c_str());
+
 	auto downloadFile = [](const std::string &url, const std::string &filename)
 	{
 		HINTERNET connect = InternetOpenA("Streamlabs", INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
@@ -445,11 +454,13 @@ void PluginJsHandler::JS_DOWNLOAD_ZIP(const Json &params, std::string &out_jsonR
 		out_jsonReturn = ret.dump();
 	}
 
-	blog(LOG_WARNING, "JS_DOWNLOAD_ZIP output: %s\n", out_jsonReturn.c_str());
+	blog(LOG_INFO, "JS_DOWNLOAD_ZIP output: %s\n", out_jsonReturn.c_str());
 }
 
 void PluginJsHandler::JS_READ_FILE(const Json &params, std::string &out_jsonReturn)
 {
+	blog(LOG_INFO, "JS_READ_FILE: %s\n", params.dump().c_str());
+
 	const auto &param2Value = params["param2"];
 
 	std::string filepath = param2Value.string_value();
@@ -485,10 +496,14 @@ void PluginJsHandler::JS_READ_FILE(const Json &params, std::string &out_jsonRetu
 	}
 
 	out_jsonReturn = ret.dump();
+
+	blog(LOG_INFO, "JS_READ_FILE output: %s\n", out_jsonReturn.c_str());
 }
 
 void PluginJsHandler::JS_DELETE_FILES(const Json &params, std::string &out_jsonReturn)
 {
+	blog(LOG_INFO, "JS_DELETE_FILES: %s\n", params.dump().c_str());
+
 	Json ret;
 	std::vector<std::string> errors;
 	std::vector<std::string> success;
@@ -534,10 +549,14 @@ void PluginJsHandler::JS_DELETE_FILES(const Json &params, std::string &out_jsonR
 
 	ret = Json::object({{"success", success}, {"errors", errors}});
 	out_jsonReturn = ret.dump();
+
+	blog(LOG_INFO, "JS_DELETE_FILES output: %s\n", out_jsonReturn.c_str());
 }
 
 void PluginJsHandler::JS_DROP_FOLDER(const Json &params, std::string &out_jsonReturn)
 {
+	blog(LOG_INFO, "JS_DROP_FOLDER: %s\n", params.dump().c_str());
+
 	const auto &filepath = params["param2"].string_value();
 
 	std::filesystem::path downloadsDir = std::filesystem::path(getDownloadsDir());
@@ -555,61 +574,140 @@ void PluginJsHandler::JS_DROP_FOLDER(const Json &params, std::string &out_jsonRe
 			Json ret = Json::object({{"error", "Failed to delete '" + filepath + "': " + e.what()}});
 			out_jsonReturn = ret.dump();
 		}
-	}	
+	}
+
+	blog(LOG_INFO, "JS_DROP_FOLDER output: %s\n", out_jsonReturn.c_str());
 }
 
 void PluginJsHandler::JS_QUERY_DOWNLOADS_FOLDER(const Json &params, std::string &out_jsonReturn)
 {
+	blog(LOG_INFO, "JS_QUERY_DOWNLOADS_FOLDER: %s\n", params.dump().c_str());
+
 	std::string downloadsFolderFullPath = getDownloadsDir();
 
 	std::vector<Json> pathsList;
 
 	try {
-		for (const auto &entry : std::filesystem::directory_iterator(downloadsFolderFullPath)) {
+		for (const auto &entry : std::filesystem::directory_iterator(downloadsFolderFullPath))
 			pathsList.push_back(entry.path().string());
-		}
-
+	
 		Json ret = Json::array(pathsList);
 		out_jsonReturn = ret.dump();
 	} catch (const std::filesystem::filesystem_error &e) {
 		out_jsonReturn = Json(Json::object({{"error", "Failed to query downloads folder: " + std::string(e.what())}})).dump();
 	}
+
+	blog(LOG_INFO, "JS_QUERY_DOWNLOADS_FOLDER output: %s\n", out_jsonReturn.c_str());
 }
 
 void PluginJsHandler::JS_OBS_SOURCE_CREATE(const Json &params, std::string &out_jsonReturn)
 {
-	const auto &id = params["param2"].string_value();
-	const auto &name = params["param3"].string_value();
-	const auto &settings_jsonStr = params["param4"].string_value();
-	const auto &hotkey_data_jsonStr = params["param5"].string_value();
+	blog(LOG_INFO, "JS_OBS_SOURCE_CREATE: %s\n", params.dump().c_str());
 
-	obs_data_t *settings = obs_data_create_from_json(settings_jsonStr.c_str());
-	obs_data_t *hotkeys = obs_data_create_from_json(hotkey_data_jsonStr.c_str());
+	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
 
-	obs_data_release(hotkeys);
-	obs_data_release(settings);
+	// This code is executed in the context of the QMainWindow's thread.
+	QMetaObject::invokeMethod(
+		mainWindow,
+		[mainWindow, this, &params, &out_jsonReturn]() {
+			const auto &id = params["param2"].string_value();
+			const auto &name = params["param3"].string_value();
+			const auto &settings_jsonStr = params["param4"].string_value();
+			const auto &hotkey_data_jsonStr = params["param5"].string_value();
 
-	obs_source_t *source = obs_source_create(id.c_str(), name.c_str(), settings, hotkeys);
+			// Name is also the guid, duplicates can't exist
+			//	see "bool AddNew(QWidget *parent, const char *id, const char *name," in obs gui code
+			OBSSourceAutoRelease existingSource = obs_get_source_by_name(name.c_str());
 
-	if (!source) {
-		out_jsonReturn = Json(Json::object({{"error", "obs_source_create returned null"}})).dump();
-		return;
-	}
+			if (existingSource != nullptr) {
+				out_jsonReturn = Json(Json::object({{"error", "name already exists, " + name}})).dump();
+				return;
+			}
 
-	// todo; store refs
-	//uint64_t uid = osn::Source::Manager::GetInstance().find(source);
-	uint64_t uid = 0;
+			obs_data_t *settings = obs_data_create_from_json(settings_jsonStr.c_str());
+			obs_data_t *hotkeys = obs_data_create_from_json(hotkey_data_jsonStr.c_str());
 
-	obs_data_t *settingsSource = obs_source_get_settings(source);
+			obs_data_release(hotkeys);
+			obs_data_release(settings);
 
-	Json jsonReturnValue = Json::object({{"uid", Json(std::to_string(uid))},
-					     {"settings", Json(obs_data_get_json(settingsSource))},
-					     {"audio_mixers", Json(std::to_string(obs_source_get_audio_mixers(source)))},
-					     {"deinterlace_mode", Json(std::to_string(obs_source_get_deinterlace_mode(source)))},
-					     {"deinterlace_field_order", Json(std::to_string(obs_source_get_deinterlace_field_order(source)))}});
-	
-	out_jsonReturn = jsonReturnValue.dump();
+			obs_source_t* source = obs_source_create(id.c_str(), name.c_str(), settings, hotkeys);
 
-	obs_data_release(settingsSource);
+			if (!source) {
+				out_jsonReturn = Json(Json::object({{"error", "obs_source_create returned null"}})).dump();
+				return;
+			}
+
+			obs_data_t *settingsSource = obs_source_get_settings(source);
+
+			Json jsonReturnValue = Json::object(
+				{{"settings", Json(obs_data_get_json(settingsSource))},
+				 {"audio_mixers", Json(std::to_string(obs_source_get_audio_mixers(source)))},
+				 {"deinterlace_mode", Json(std::to_string(obs_source_get_deinterlace_mode(source)))},
+				 {"deinterlace_field_order", Json(std::to_string(obs_source_get_deinterlace_field_order(source)))}});
+
+			out_jsonReturn = jsonReturnValue.dump();
+			obs_data_release(settingsSource);
+		},
+		Qt::BlockingQueuedConnection);
+
+	blog(LOG_INFO, "JS_OBS_SOURCE_CREATE output: %s\n", out_jsonReturn.c_str());
+}
+
+void PluginJsHandler::JS_OBS_SOURCE_DESTROY(const Json &params, std::string &out_jsonReturn)
+{
+	blog(LOG_INFO, "JS_OBS_SOURCE_DESTROY: %s\n", params.dump().c_str());
+
+	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
+
+	// This code is executed in the context of the QMainWindow's thread.
+	QMetaObject::invokeMethod(
+		mainWindow,
+		[mainWindow, this, params, &out_jsonReturn]() {
+
+			printf("Hey\n");
+			const auto &name = params["param2"].string_value();
+			
+			OBSSourceAutoRelease src = obs_get_source_by_name(name.c_str());
+			
+			auto itr = m_sources.find(name);
+			
+			if (itr != m_sources.end())
+				m_sources.erase(itr);
+			
+			if (src == nullptr) {
+				out_jsonReturn = Json(Json::object({{"error", "Can't find source with name " + name}})).dump();
+				return;
+			}
+			
+			if (obs_source_get_type(src) == OBS_SOURCE_TYPE_TRANSITION) {
+				obs_source_release(src);
+			} else if (obs_source_get_type(src) == OBS_SOURCE_TYPE_SCENE) {
+				blog(LOG_INFO, "Releasing scene %s", obs_source_get_name(src));
+				std::list<obs_sceneitem_t *> items;
+				auto cb = [](obs_scene_t *scene, obs_sceneitem_t *item, void *data) {
+					if (item) {
+						std::list<obs_sceneitem_t *> *items = reinterpret_cast<std::list<obs_sceneitem_t *> *>(data);
+						obs_sceneitem_addref(item);
+						items->push_back(item);
+					}
+					return true;
+				};
+				obs_scene_t *scene = obs_scene_from_source(src);
+				if (scene)
+					obs_scene_enum_items(scene, cb, &items);
+			
+				for (auto item : items) {
+					obs_sceneitem_remove(item);
+					obs_sceneitem_release(item);
+				}
+			
+				obs_source_release(src);
+			} else {
+				obs_source_remove(src);
+			}			
+		},
+		Qt::BlockingQueuedConnection);
+
+	blog(LOG_INFO, "JS_OBS_SOURCE_DESTROY output: %s\n", out_jsonReturn.c_str());
 }
 

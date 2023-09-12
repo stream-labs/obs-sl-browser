@@ -83,6 +83,9 @@ static void BrowserInit()
 	CefString(&settings.log_file) = "C:/Users/srogers/Desktop/cef.log";
 	settings.log_severity = LOGSEVERITY_DEBUG;
 
+	// Set the remote debugging port
+	settings.remote_debugging_port = 9123;
+
 	app = new BrowserApp();
 
 	CefExecuteProcess(args, app, nullptr);

@@ -8,9 +8,9 @@ class JavascriptApi
 public:
 	enum JSFuncs {
 		JS_INVALID = 0,
-		JS_PANEL_EXECUTEJAVASCRIPT ,
-		JS_PANEL_SETURL,
-		JS_QUERY_PANELS,
+		JS_DOCK_EXECUTEJAVASCRIPT ,
+		JS_DOCK_SETURL,
+		JS_QUERY_DOCKS,
 		JS_DOWNLOAD_ZIP,
 		JS_READ_FILE,
 		JS_DELETE_FILES,
@@ -18,6 +18,9 @@ public:
 		JS_QUERY_DOWNLOADS_FOLDER,
 		JS_OBS_SOURCE_CREATE,
 		JS_OBS_SOURCE_DESTROY,
+		JS_DOCK_SETAREA,
+		JS_DOCK_SWAP,
+		JS_DOCK_NEW_BROWSER_DOCK,
 	};
 public:
 	static std::map<std::string, JSFuncs> &getGlobalFunctionNames()
@@ -27,18 +30,36 @@ public:
 		static std::map<std::string, JSFuncs> names =
 		{
 			/***
-			* Panels
+			* Docks
 			*/
 
 			// .(@function(arg1))
-			//	Example arg1 = [{ "path": "..." }, { "path": "..." }]
-			{"query_panels", JS_QUERY_PANELS},
+			// Docks with sl_uuid's are browser docks
+			//	Example arg1 = [{ "name": ".", "x": ".", "y": ".", "floating": bool, "sl_uuid": ".", "url": "." },]
+			{"dock_queryAll", JS_QUERY_DOCKS},
 
-			// .(@paneluid, @url)
-			{"panel_setURL", JS_PANEL_SETURL},
+			// .(@dockuid, @url)
+			{"dock_setURL", JS_DOCK_SETURL},
 
-			// .(@paneluid, @jsString)
-			{"panel_executeJavascript", JS_PANEL_EXECUTEJAVASCRIPT},
+			// .(@dockuid, @jsString)
+			{"dock_executeJavascript", JS_DOCK_EXECUTEJAVASCRIPT},
+
+			// .(@dockName, @areaMask)
+			//	areaMask can be a combination of Left Right Top Bottom, ie (LeftDockWidgetArea | RightDockWidgetArea) or (TopDockWidgetArea | BottomDockWidgetArea)
+			//	These are the current values from Qt
+			//		LeftDockWidgetArea = 0x1,
+			//		RightDockWidgetArea = 0x2,
+			//		TopDockWidgetArea = 0x4,
+			//		BottomDockWidgetArea = 0x8,
+			{"dock_setArea", JS_DOCK_SETAREA},
+
+			// .(@dockName1, @dockName2)
+			//	Swaps the the positions of dock1 with dock2 
+			{"dock_swap", JS_DOCK_SWAP},
+			
+			// .(@title, @url, @sl_uuid)
+			//	Swaps the the positions of dock1 with dock2
+			{"dock_newBrowserDock", JS_DOCK_NEW_BROWSER_DOCK},
 
 			/***
 			* Filesystem
@@ -47,25 +68,25 @@ public:
 			// .(@function(arg1), @url)
 			// Downloads and unpacks the zip, returning a list of full file paths to the files that were in it
 			//	Example arg1 = [{ "path": "..." },]
-			{"downloadZip", JS_DOWNLOAD_ZIP},
+			{"fs_downloadZip", JS_DOWNLOAD_ZIP},
 
 			// .(@function(arg1), @filepath)
 			// Returns the contents of a file as a string. If the filesize is over 1mb this will return an error
 			//	Example arg1 = { "contents": "..." }
-			{"readFile", JS_READ_FILE},
+			{"fs_readFile", JS_READ_FILE},
 
 			// .(@filepaths_jsonStr)
 			// Json string, array, [{ path: "..." },] paths must be relative to the streamlabs download folder, ie "/download1234/file.png"
-			{"deleteFiles", JS_DELETE_FILES},
+			{"fs_deleteFiles", JS_DELETE_FILES},
 
 			// .(@path)
 			// Path must be relative to the streamlabs download folder, ie "/download1234/"
-			{"dropFolder", JS_DROP_FOLDER},
+			{"fs_dropFolder", JS_DROP_FOLDER},
 
 			// .(@function(arg1))
 			// Returns comprehensive list of everything in our downloads folder
 			//	Example arg1 = [{ "path": "..." },]
-			{"queryDownloadsFolder", JS_QUERY_DOWNLOADS_FOLDER},
+			{"fs_queryDownloadsFolder", JS_QUERY_DOWNLOADS_FOLDER},
 
 			/***
 			* obs_source

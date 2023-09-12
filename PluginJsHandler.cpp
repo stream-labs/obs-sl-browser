@@ -3,7 +3,6 @@
 // Local
 #include "JavascriptApi.h"
 #include "GrpcPlugin.h"
-#include "BrowserDockCaster.h"
 #include "cef-headers.hpp"
 #include "deps/minizip/unzip.h"
 
@@ -14,10 +13,12 @@
 // Stl
 #include <chrono>
 #include <fstream>
+#include <functional>
 
 // Obs
 #include <obs.hpp>
 #include <obs-frontend-api.h>
+
 #include "../obs-browser/panel/browser-panel-internal.hpp"
 
 // Qt
@@ -100,16 +101,16 @@ void PluginJsHandler::executeApiRequest(const std::string& funcName, const std::
 	std::string jsonReturnStr;
 
 	switch (JavascriptApi::getFunctionId(funcName)) {
-	case JavascriptApi::JS_PANEL_EXECUTEJAVASCRIPT: {
-		JS_PANEL_EXECUTEJAVASCRIPT(jsonParams, jsonReturnStr);
+	case JavascriptApi::JS_DOCK_EXECUTEJAVASCRIPT: {
+		JS_DOCK_EXECUTEJAVASCRIPT(jsonParams, jsonReturnStr);
 		break;
 	}
-	case JavascriptApi::JS_PANEL_SETURL: {
-		JS_PANEL_SETURL(jsonParams, jsonReturnStr);
+	case JavascriptApi::JS_DOCK_SETURL: {
+		JS_DOCK_SETURL(jsonParams, jsonReturnStr);
 		break;
 	}
-	case JavascriptApi::JS_QUERY_PANELS: {
-		JS_QUERY_PANELS(jsonParams, jsonReturnStr);
+	case JavascriptApi::JS_QUERY_DOCKS: {
+		JS_QUERY_DOCKS(jsonParams, jsonReturnStr);
 		break;
 	}
 	case JavascriptApi::JS_DOWNLOAD_ZIP: {
@@ -139,71 +140,129 @@ void PluginJsHandler::executeApiRequest(const std::string& funcName, const std::
 	case JavascriptApi::JS_OBS_SOURCE_DESTROY: {
 		JS_OBS_SOURCE_DESTROY(jsonParams, jsonReturnStr);
 		break;
+	}
+	case JavascriptApi::JS_DOCK_NEW_BROWSER_DOCK: {
+		JS_DOCK_NEW_BROWSER_DOCK(jsonParams, jsonReturnStr);
+		break;
 	}						     
 	}
-
+	
 	// We're done, send callback
 	if (param1Value.int_value() > 0)
 		GrpcPlugin::instance().getClient()->send_executeCallback(param1Value.int_value(), jsonReturnStr);
 }
 
-void PluginJsHandler::JS_QUERY_PANELS(const Json &params, std::string &out_jsonReturn)
+void PluginJsHandler::JS_QUERY_DOCKS(const Json &params, std::string &out_jsonReturn)
 {
-	blog(LOG_WARNING, "JS_QUERY_PANELS start: %s\n", params.dump().c_str());
+	blog(LOG_WARNING, "JS_QUERY_DOCKS start: %s\n", params.dump().c_str());
 
 	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
+	std::string sl_panel_prefix = m_sl_panel_Prefix;
 
 	QMetaObject::invokeMethod(
 		mainWindow,
-		[mainWindow, &out_jsonReturn]() {
-			std::vector<Json> panelInfo;
+		[mainWindow, sl_panel_prefix, &out_jsonReturn]() {
+			std::vector<Json> dockInfo;
 
 			QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
 			foreach(QDockWidget * dock, docks)
 			{
-				if (dock->property("uuid").isValid()) {
-					QCefWidgetInternal *widget = (QCefWidgetInternal *)BrowserDockCaster::getQCefWidget(dock);
+				std::string name = dock->objectName().toStdString();
+				std::string sl_uuid;
+				std::string url;
+
+				// Translate the global coordinates to coordinates relative to the main window
+				QRect globalGeometry = dock->geometry();
+				QRect mainWindowGeometry = mainWindow->geometry();
+				int x = globalGeometry.x() - mainWindowGeometry.x();
+				int y = globalGeometry.y() - mainWindowGeometry.y();
+
+				bool floating = dock->isFloating();
+
+				if (dock->objectName().toStdString().find(sl_panel_prefix) != std::string::npos) {
+					QCefWidgetInternal *widget = (QCefWidgetInternal *)dock->widget();
 
 					if (widget->cefBrowser != nullptr) {
-						std::string uuid = dock->property("uuid").toString().toStdString();
-						std::string url = widget->cefBrowser->GetMainFrame()->GetURL();
-
-						// Create a Json object for this dock widget and add it to the panelInfo vector
-						panelInfo.push_back(Json::object{{"uuid", uuid}, {"url", url}});
+						sl_uuid = dock->property("sl_uuid").toString().toStdString();
+						url = widget->cefBrowser->GetMainFrame()->GetURL();
 					}
 				}
+
+				// Create a Json object for this dock widget and add it to the panelInfo vector
+				dockInfo.push_back(Json::object{
+					{"name", name}, {"x", x}, {"y", y}, {"floating", floating}, {"sl_uuid", sl_uuid}, {"url", url}}
+				);
 			}
 
 			// Convert the panelInfo vector to a Json object and dump string
-			Json ret = panelInfo;
+			Json ret = dockInfo;
 			out_jsonReturn = ret.dump();
 		},
 		Qt::BlockingQueuedConnection);
 
 
-	blog(LOG_WARNING, "JS_QUERY_PANELS output: %s\n", out_jsonReturn.c_str());
+	blog(LOG_WARNING, "JS_QUERY_DOCKS output: %s\n", out_jsonReturn.c_str());
 }
 
-void PluginJsHandler::JS_PANEL_EXECUTEJAVASCRIPT(const Json &params, std::string &out_jsonReturn)
+void PluginJsHandler::JS_DOCK_SETAREA(const Json &params, std::string &out_jsonReturn)
 {
-	blog(LOG_WARNING, "JS_PANEL_EXECUTEJAVASCRIPT: %s\n", params.dump().c_str());
+	blog(LOG_WARNING, "JS_DOCK_SETAREA start: %s\n", params.dump().c_str());
 
 	const auto &param2Value = params["param2"];
 	const auto &param3Value = params["param3"];
+
+	std::string panelName = param2Value.string_value();
+	int areaMask = param3Value.int_value();
+
+	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
+
+	QMetaObject::invokeMethod(
+		mainWindow,
+		[mainWindow, &panelName, areaMask, &params, &out_jsonReturn]() {
+
+			// Find the panel by name (assuming the name is stored as a property)
+			QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
+			foreach(QDockWidget * dock, docks)
+			{
+				if (dock->objectName().toStdString() == panelName) {
+
+					// Map the input area mask to the corresponding Qt::DockWidgetArea
+					Qt::DockWidgetArea dockArea = static_cast<Qt::DockWidgetArea>(areaMask & Qt::DockWidgetArea_Mask);
+					mainWindow->addDockWidget(dockArea, dock);
+					break;
+				}
+			}
+
+			// Build a response JSON object (modify as necessary)
+			Json ret = Json::object{{"status", "success"}};
+			out_jsonReturn = ret.dump();
+		},
+		Qt::BlockingQueuedConnection);
+
+	blog(LOG_WARNING, "JS_DOCK_SETAREA output: %s\n", out_jsonReturn.c_str());
+}
+
+void PluginJsHandler::JS_DOCK_EXECUTEJAVASCRIPT(const Json &params, std::string &out_jsonReturn)
+{
+	blog(LOG_WARNING, "JS_DOCK_EXECUTEJAVASCRIPT: %s\n", params.dump().c_str());
+
+	const auto &param2Value = params["param2"];
+	const auto &param3Value = params["param3"];
+
+	std::string sl_panel_prefix = m_sl_panel_Prefix;
 
 	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
 
 	// This code is executed in the context of the QMainWindow's thread.
 	QMetaObject::invokeMethod(
 		mainWindow,
-		[mainWindow, param2Value, param3Value, &out_jsonReturn]() {
+		[mainWindow, param2Value, param3Value, sl_panel_prefix, &out_jsonReturn]() {
 			QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
 			foreach(QDockWidget * dock, docks)
 			{
-				if (dock->property("uuid").isValid() &&
-				    dock->property("uuid").toString().toStdString() == param3Value.string_value()) {
-					QCefWidgetInternal *widcket = (QCefWidgetInternal *)BrowserDockCaster::getQCefWidget(dock);
-					widcket->executeJavaScript(param2Value.string_value().c_str());
+				if (dock->objectName().toStdString() == sl_panel_prefix + param3Value.string_value()) {
+					QCefWidgetInternal *widget = (QCefWidgetInternal *)dock->widget();
+					widget->executeJavaScript(param2Value.string_value().c_str());
 					return;
 				}
 			}
@@ -214,30 +273,67 @@ void PluginJsHandler::JS_PANEL_EXECUTEJAVASCRIPT(const Json &params, std::string
 		},
 		Qt::BlockingQueuedConnection);
 
-	blog(LOG_WARNING, "JS_PANEL_EXECUTEJAVASCRIPT output: %s\n", out_jsonReturn.c_str());
+	blog(LOG_WARNING, "JS_DOCK_EXECUTEJAVASCRIPT output: %s\n", out_jsonReturn.c_str());
 }
 
-void PluginJsHandler::JS_PANEL_SETURL(const Json &params, std::string &out_jsonReturn)
+void PluginJsHandler::JS_DOCK_NEW_BROWSER_DOCK(const json11::Json &params, std::string &out_jsonReturn)
 {
-	blog(LOG_INFO, "JS_PANEL_SETURL: %s\n", params.dump().c_str());
+	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
+	std::string sl_panel_prefix = m_sl_panel_Prefix;
+
+	//todo grab from json
+	std::string sl_uuid = "123";
+	std::string title = "Helloz";
+	std::string url = "google.com";
+
+	QMetaObject::invokeMethod(
+		mainWindow,
+		[mainWindow, sl_panel_prefix, sl_uuid, title, url]() {
+			static QCef *qcef = obs_browser_init_panel();
+			std::string objectName = (sl_panel_prefix + sl_uuid);
+
+			obs_frontend_add_dock_by_id(objectName.c_str(), title.c_str(), nullptr);
+
+			// We have to go find the thing we just made... zzz...			
+			QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
+			foreach(QDockWidget * dock, docks)
+			{
+				if (dock->objectName().toStdString() == objectName) {
+
+					QCefWidget *browser = qcef->create_widget(dock, url, nullptr);
+					dock->setWidget(browser);
+					dock->resize(460, 600);
+					dock->setMinimumSize(80, 80);
+					dock->setVisible(true);
+					break;
+				}
+			}
+		},
+		Qt::BlockingQueuedConnection);
+
+}
+
+void PluginJsHandler::JS_DOCK_SETURL(const Json &params, std::string &out_jsonReturn)
+{
+	blog(LOG_INFO, "JS_DOCK_SETURL: %s\n", params.dump().c_str());
 
 	const auto &param2Value = params["param2"];
 	const auto &param3Value = params["param3"];
+
+	std::string sl_panel_prefix = m_sl_panel_Prefix;
 
 	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
 
 	// This code is executed in the context of the QMainWindow's thread.
 	QMetaObject::invokeMethod(mainWindow,
-		[mainWindow, param2Value, param3Value, &out_jsonReturn]() {
+		[mainWindow, param2Value, param3Value, sl_panel_prefix, &out_jsonReturn]() {
 			
 			QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
 			foreach(QDockWidget * dock, docks)
 			{
-				if (dock->property("uuid").isValid() &&
-				    dock->property("uuid").toString().toStdString() == param3Value.string_value())
-				{
-					QCefWidgetInternal *widcket = (QCefWidgetInternal *)BrowserDockCaster::getQCefWidget(dock);
-					widcket->setURL(param2Value.string_value().c_str());
+				if (dock->objectName().toStdString() == sl_panel_prefix + param3Value.string_value()) {
+					QCefWidgetInternal *widget = (QCefWidgetInternal *)dock->widget();
+					widget->setURL(param2Value.string_value().c_str());
 					return;
 				}
 			}
@@ -248,7 +344,7 @@ void PluginJsHandler::JS_PANEL_SETURL(const Json &params, std::string &out_jsonR
 		},
 		Qt::BlockingQueuedConnection);
 
-	blog(LOG_INFO, "JS_PANEL_SETURL output: %s\n", out_jsonReturn.c_str());
+	blog(LOG_INFO, "JS_DOCK_SETURL output: %s\n", out_jsonReturn.c_str());
 }
 
 void PluginJsHandler::JS_DOWNLOAD_ZIP(const Json &params, std::string &out_jsonReturn)

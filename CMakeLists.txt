@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.16...3.25)
 
 find_package(CEF REQUIRED)
 find_package(ZLIB REQUIRED)
+
 find_qt(COMPONENTS Widgets)
 
 include(FindGRPC.cmake)
@@ -12,7 +13,6 @@ include(FindGRPC.cmake)
 get_filename_component(papi_proto "sl_browser_api.proto" ABSOLUTE) 
 get_filename_component(papi_proto_path "${papi_proto}" PATH)
 
-message ("hello")
 message ("${CMAKE_CURRENT_BINARY_DIR}")
 
 # Generated sources
@@ -84,9 +84,8 @@ target_include_directories(sl-browser PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/deps"
 target_compile_features(sl-browser PRIVATE cxx_std_17)
 
 target_link_libraries(sl-browser PRIVATE CEF::Wrapper CEF::Library d3d11 dxgi)
-target_link_libraries(sl-browser PRIVATE Qt::Widgets)
-target_link_libraries(sl-browser PRIVATE Qt::Core)
-target_link_libraries(sl-browser PRIVATE Qt::Gui)
+target_link_libraries(sl-browser PRIVATE Qt::Widgets Qt::Core Qt::Gui)
+
 target_link_libraries(sl-browser PRIVATE 
 	  papi_grpc_proto
 	  ${_REFLECTION}
@@ -113,14 +112,9 @@ target_sources(
   sl-browser-plugin
   PRIVATE sl-browser-plugin.cpp
     GrpcPlugin.cpp
-    PluginJsHandler.h
     PluginJsHandler.cpp
-    WebSocketServer.h
     WebSocketServer.cpp
-    BrowserDockCaster.h
-    BrowserDockCaster.cpp
     deps/json11/json11.cpp
-    deps/json11/json11.hpp
     deps/minizip/ioapi.c
     deps/minizip/iowin32.c
     deps/minizip/mztools.c
@@ -135,13 +129,19 @@ target_link_libraries(sl-browser-plugin PRIVATE CEF::Wrapper CEF::Library)
 target_link_libraries(sl-browser-plugin PRIVATE Qt::Widgets)
 target_link_libraries(sl-browser-plugin PRIVATE Qt::Core)
 target_link_libraries(sl-browser-plugin PRIVATE Qt::Gui)
+target_link_libraries(sl-browser-plugin PRIVATE Qt::Svg)
 target_link_libraries(sl-browser-plugin PRIVATE ${LIBWEBSOCKETS_LIB})
 
 target_include_directories(sl-browser-plugin PRIVATE ${LIBWEBSOCKETS_INCLUDE})
+target_include_directories(sl-browser-plugin PRIVATE ${LIBWEBSOCKETS_INCLUDE})
 target_include_directories(sl-browser-plugin PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/deps")
-target_include_directories(sl-browser-plugin PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../obs-browser/panel/")
+target_include_directories(sl-browser-plugin PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/deps/json11")
+target_include_directories(sl-browser-plugin PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../obs-browser/panel")
+target_include_directories(sl-browser-plugin PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/UI")
 
 target_compile_features(sl-browser-plugin PRIVATE cxx_std_17)
+target_compile_definitions(sl-browser-plugin PRIVATE BROWSER_AVAILABLE)
+
 target_link_libraries(sl-browser-plugin PRIVATE OBS::libobs OBS::frontend-api)
 target_link_libraries(sl-browser-plugin PRIVATE ZLIB::ZLIB)
 
@@ -154,6 +154,9 @@ target_link_libraries(sl-browser-plugin PRIVATE
 target_link_options(sl-browser-plugin PRIVATE 
   "/IGNORE:4099" # Ignore PDB warnings
   "/IGNORE:4098" 
+)
+target_compile_options(sl-browser-plugin PRIVATE 
+  "/wd4996" # 'obs_frontend_add_dock': was declared deprecated
 )
 
 target_compile_options(sl-browser-plugin PRIVATE $<IF:$<CONFIG:DEBUG>,/MTd,/MT>)

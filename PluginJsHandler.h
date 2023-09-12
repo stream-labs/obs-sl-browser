@@ -25,9 +25,9 @@ public:
 private:
 	void workerThread();
 
-	void JS_QUERY_PANELS(const json11::Json &params, std::string &out_jsonReturn);
-	void JS_PANEL_EXECUTEJAVASCRIPT(const json11::Json &params, std::string &out_jsonReturn);
-	void JS_PANEL_SETURL(const json11::Json &params, std::string &out_jsonReturn);
+	void JS_QUERY_DOCKS(const json11::Json &params, std::string &out_jsonReturn);
+	void JS_DOCK_EXECUTEJAVASCRIPT(const json11::Json &params, std::string &out_jsonReturn);
+	void JS_DOCK_SETURL(const json11::Json &params, std::string &out_jsonReturn);
 	void JS_DOWNLOAD_ZIP(const json11::Json &params, std::string &out_jsonReturn);
 	void JS_READ_FILE(const json11::Json &params, std::string &out_jsonReturn);
 	void JS_DELETE_FILES(const json11::Json &params, std::string &out_jsonReturn);
@@ -35,6 +35,8 @@ private:
 	void JS_QUERY_DOWNLOADS_FOLDER(const json11::Json &params, std::string &out_jsonReturn);
 	void JS_OBS_SOURCE_CREATE(const json11::Json &params, std::string &out_jsonReturn);
 	void JS_OBS_SOURCE_DESTROY(const json11::Json &params, std::string &out_jsonReturn);
+	void JS_DOCK_SETAREA(const json11::Json &params, std::string &out_jsonReturn);
+	void JS_DOCK_NEW_BROWSER_DOCK(const json11::Json &params, std::string &out_jsonReturn);
 
 	std::string getDownloadsDir() const;
 
@@ -44,4 +46,6 @@ private:
 	std::thread m_workerThread;
 
 	std::map<std::string, obs_source_t*> m_sources;
+
+	std::string m_sl_panel_Prefix = "sl_panel_";
 };

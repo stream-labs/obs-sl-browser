@@ -37,7 +37,9 @@ private:
 	void JS_OBS_SOURCE_DESTROY(const json11::Json &params, std::string &out_jsonReturn);
 	void JS_DOCK_SETAREA(const json11::Json &params, std::string &out_jsonReturn);
 	void JS_DOCK_NEW_BROWSER_DOCK(const json11::Json &params, std::string &out_jsonReturn);
-
+	void JS_GET_MAIN_WINDOW_GEOMETRY(const json11::Json &params, std::string &out_jsonReturn);
+	void JS_TOGGLE_USER_INPUT(const json11::Json &params, std::string &out_jsonReturn);
+	
 	std::string getDownloadsDir() const;
 
 	std::mutex m_queueMtx;
@@ -46,6 +48,4 @@ private:
 	std::thread m_workerThread;
 
 	std::map<std::string, obs_source_t*> m_sources;
-
-	std::string m_sl_panel_Prefix = "sl_panel_";
 };

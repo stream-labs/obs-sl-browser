@@ -5,7 +5,7 @@
 
 extern CefRefPtr<BrowserClient> browserClient;
 
-	/***
+/***
 * Server
 * Receiving messages from the plugin
 */

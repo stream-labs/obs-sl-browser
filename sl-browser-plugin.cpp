@@ -21,6 +21,11 @@ MODULE_EXPORT const char *obs_module_description(void)
 
 bool obs_module_load(void)
 {
+	AllocConsole();
+	freopen("conin$", "r", stdin);
+	freopen("conout$", "w", stdout);
+	freopen("conout$", "w", stderr);
+	printf("Plugin loaded\n");
 	return true;
 }
 
@@ -31,12 +36,6 @@ void obs_module_post_load(void)
 {
 	if (launched)
 		return;
-
-	AllocConsole();
-	freopen("conin$", "r", stdin);
-	freopen("conout$", "w", stdout);
-	freopen("conout$", "w", stderr);
-	printf("Debugging Window:\n");
 
 	WebSocketServer::instance().start();
 	PluginJsHandler::instance().start();

@@ -20,11 +20,11 @@ private:
 	std::unique_ptr<grpc_plugin_obj::Stub> stub_;
 };
 
-class GrpcProxy {
+class GrpcBrowser {
 public:
-	static GrpcProxy &instance()
+	static GrpcBrowser &instance()
 	{
-		static GrpcProxy a;
+		static GrpcBrowser a;
 		return a;
 	}
 
@@ -37,8 +37,8 @@ public:
 
 
 private:
-	GrpcProxy();
-	~GrpcProxy();
+	GrpcBrowser();
+	~GrpcBrowser();
 
 	int32_t m_listenPort{0};
 

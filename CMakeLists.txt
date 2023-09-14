@@ -61,7 +61,8 @@ endif()
 target_sources(
   sl-browser
   PRIVATE main.cpp
-          GrpcProxy.cpp
+          GrpcBrowser.cpp
+          SlBrowser.cpp
           browser-app.cpp
           browser-app.hpp
           browser-client.cpp

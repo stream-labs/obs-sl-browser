@@ -53,6 +53,82 @@ void PluginJsHandler::stop()
 		m_workerThread.join();
 }
 
+void PluginJsHandler::loadSlabsBrowserDocks()
+{
+	const char *jsonStr = config_get_string(obs_frontend_get_global_config(), "BasicWindow", "SlabsBrowserDocks");
+
+	std::string err;
+	Json json = Json::parse(jsonStr, err);
+	if (!err.empty())
+		return;
+
+	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
+
+	Json::array array = json.array_items();
+
+	for (Json &item : array) {
+		std::string title = item["title"].string_value();
+		std::string url = item["url"].string_value();
+		std::string sl_uuid = item["sl_uuid"].string_value();
+				
+		static QCef *qcef = obs_browser_init_panel();
+		std::string objectName = (SL_DOCK_PREFIX + sl_uuid);
+
+		obs_frontend_add_dock_by_id(objectName.c_str(), title.c_str(), nullptr);
+
+		// We have to go find the thing we just made... zzz...
+		QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
+		foreach(QDockWidget* dock, docks)
+		{
+			if (dock->objectName().toStdString() == objectName) {
+
+				QCefWidget *browser = qcef->create_widget(dock, url, nullptr);
+				dock->setObjectName(title + SL_DOCK_PREFIX);
+				dock->resize(460, 600);
+				dock->setMinimumSize(80, 80);
+				dock->setWindowTitle(title.c_str());
+				dock->setAllowedAreas(Qt::AllDockWidgetAreas);
+				dock->setWidget(browser);
+				break;
+			}
+		}
+	}
+}
+
+void PluginJsHandler::saveSlabsBrowserDocks()
+{
+	Json::array jarray;
+	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
+	QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
+
+	foreach(QDockWidget * dock, docks)
+	{
+		std::string dockName = dock->objectName().toStdString();
+
+		if (dockName.find(SL_DOCK_PREFIX) != std::string::npos)
+		{
+			QCefWidgetInternal *widget = (QCefWidgetInternal *)dock->widget();
+
+			std::string url;
+			std::string sl_uuid = dockName.substr(dockName.find(SL_DOCK_PREFIX) + strlen(SL_DOCK_PREFIX));
+
+			if (widget->cefBrowser != nullptr)
+				url = widget->cefBrowser->GetMainFrame()->GetURL();
+
+			Json::object obj{
+				{"title", dock->windowTitle().toStdString()},
+				{"url", url},
+				{"sl_uuid", sl_uuid},
+			};
+
+			jarray.push_back(obj);
+		}
+	}
+
+	std::string output = Json(jarray).dump();
+	config_set_string(obs_frontend_get_global_config(), "BasicWindow", "ExtraBrowserDocks", output.c_str());
+}
+
 void PluginJsHandler::pushApiRequest(const std::string &funcName, const std::string &params)
 {
 	std::lock_guard<std::mutex> grd(m_queueMtx);
@@ -194,11 +270,14 @@ void PluginJsHandler::JS_QUERY_DOCKS(const Json &params, std::string &out_jsonRe
 
 				bool floating = dock->isFloating();
 
-				if (dock->objectName().toStdString().find(SL_DOCK_PREFIX) != std::string::npos) {
+				std::string dockName = dock->objectName().toStdString();
+
+				if (dockName.find(SL_DOCK_PREFIX) != std::string::npos)
+				{
+					sl_uuid = dockName.substr(dockName.find(SL_DOCK_PREFIX) + strlen(SL_DOCK_PREFIX));
 					QCefWidgetInternal *widget = (QCefWidgetInternal *)dock->widget();
 
 					if (widget->cefBrowser != nullptr) {
-						sl_uuid = dock->property("sl_uuid").toString().toStdString();
 						url = widget->cefBrowser->GetMainFrame()->GetURL();
 					}
 				}

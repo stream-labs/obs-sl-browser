@@ -17,7 +17,7 @@ class grpc_proxy_objImpl final : public grpc_proxy_obj::Service {
 		execute_args->SetInt(0, request->funcid());
 		execute_args->SetString(1, request->jsonstr());
 
-		if (auto ptr = browserClient->PopCallback(request->funcid())) {
+		if (auto ptr = SlBrowser::instance().browserClient->PopCallback(request->funcid())) {
 			SendBrowserProcessMessage(ptr, PID_RENDERER, msg);
 		}
 		else {

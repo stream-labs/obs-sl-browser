@@ -1,21 +1,3 @@
-/******************************************************************************
- Copyright (C) 2014 by John R. Bradley <jrb@turrettech.com>
- Copyright (C) 2023 by Lain Bailey <lain@obsproject.com>
-
- This program is free software: you can redistribute it and/or modify
- it under the terms of the GNU General Public License as published by
- the Free Software Foundation, either version 2 of the License, or
- (at your option) any later version.
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License
- along with this program.  If not, see <http://www.gnu.org/licenses/>.
- ******************************************************************************/
-
 #include "browser-client.hpp"
 #include "base64/base64.hpp"
 #include "json11/json11.hpp"
@@ -24,7 +6,7 @@
 #include <QThread>
 #include <QToolTip>
 
-#include "GrpcProxy.h"
+#include "GrpcBrowser.h"
 
 inline bool BrowserClient::valid() const
 {
@@ -199,7 +181,7 @@ bool BrowserClient::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefR
 
 	RegisterCallback(input_args->GetInt(0), browser);
 
-	if (!GrpcProxy::instance().getClient()->send_js_api(name, cefListValueToJSONString(input_args)))
+	if (!GrpcBrowser::instance().getClient()->send_js_api(name, cefListValueToJSONString(input_args)))
 	{
 		// todo; handle
 		abort();

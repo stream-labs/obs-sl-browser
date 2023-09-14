@@ -24,6 +24,8 @@ public:
 
 private:
 	void workerThread();
+	void loadSlabsBrowserDocks();
+	void saveSlabsBrowserDocks();
 
 	void JS_QUERY_DOCKS(const json11::Json &params, std::string &out_jsonReturn);
 	void JS_DOCK_EXECUTEJAVASCRIPT(const json11::Json &params, std::string &out_jsonReturn);

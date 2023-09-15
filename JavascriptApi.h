@@ -52,6 +52,7 @@ public:
 			// .(@objectName, @bool_visible)
 			{"dock_toggleBrowserDockVisibility", JS_TOGGLE_DOCK_VISIBILITY},
 
+			// Current release, OBS 29.1, does not have api support for destroying docks. Futurue releases will.
 			// .(@objectName)
 			//	Only works on docks we've created
 			{"dock_destroyBrowserDock", JS_DESTROY_DOCK},

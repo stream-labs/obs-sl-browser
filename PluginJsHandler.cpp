@@ -3,7 +3,6 @@
 // Local
 #include "JavascriptApi.h"
 #include "GrpcPlugin.h"
-#include "cef-headers.hpp"
 #include "deps/minizip/unzip.h"
 
 // Windows
@@ -24,6 +23,8 @@
 // Qt
 #include <QMainWindow>
 #include <QDockWidget>
+#include <QCheckBox>
+#include <QMessageBox>
 
 #pragma comment(lib, "wininet.lib")
 
@@ -183,19 +184,19 @@ void PluginJsHandler::executeApiRequest(const std::string &funcName, const std::
 void PluginJsHandler::JS_QUERY_DOCKS(const Json &params, std::string &out_jsonReturn)
 {
 	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
-
+	
 	QMetaObject::invokeMethod(
 		mainWindow,
 		[mainWindow, &out_jsonReturn]() {
 			std::vector<Json> dockInfo;
-
+	
 			QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
 			foreach(QDockWidget * dock, docks)
 			{
 				bool isSlabs = false;
 				std::string name = dock->objectName().toStdString();
 				std::string url;
-
+	
 				// Translate the global coordinates to coordinates relative to the main window
 				QRect globalGeometry = dock->geometry();
 				QRect mainWindowGeometry = mainWindow->geometry();
@@ -203,26 +204,26 @@ void PluginJsHandler::JS_QUERY_DOCKS(const Json &params, std::string &out_jsonRe
 				int y = globalGeometry.y() - mainWindowGeometry.y();
 				int width = dock->width();
 				int height = dock->height();
-
+	
 				bool floating = dock->isFloating();
-
+	
 				std::string dockName = dock->objectName().toStdString();
-
+	
 				if (dock->property("isSlabs").isValid())
 				{
 					isSlabs = true;
 					QCefWidgetInternal *widget = (QCefWidgetInternal *)dock->widget();
-
+	
 					if (widget->cefBrowser != nullptr)
 					{
-						url = widget->cefBrowser->GetMainFrame()->GetURL();
+						//url = widget->cefBrowser->GetMainFrame()->GetURL();
 					}
 				}
-
+	
 				// Create a Json object for this dock widget and add it to the panelInfo vector
 				dockInfo.push_back(Json::object{{"name", name}, {"x", x}, {"y", y}, {"width", width}, {"height", height}, {"floating", floating}, {"isSlabs", isSlabs}, {"url", url}});
 			}
-
+	
 			// Convert the panelInfo vector to a Json object and dump string
 			Json ret = dockInfo;
 			out_jsonReturn = ret.dump();
@@ -298,11 +299,16 @@ void PluginJsHandler::JS_DOCK_EXECUTEJAVASCRIPT(const Json &params, std::string 
 			QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
 			foreach(QDockWidget * dock, docks)
 			{
-				if (dock->objectName().toStdString() == objectName)
+				if (dock->objectName().toStdString() == objectName && dock->property("isSlabs").isValid())
 				{
 					QCefWidgetInternal *widget = (QCefWidgetInternal *)dock->widget();
-					widget->executeJavaScript(javascriptcode.c_str());
-					out_jsonReturn = Json(Json::object{{"status", "success"}}).dump();
+
+					if (widget->cefBrowser != nullptr)
+					{
+						widget->cefBrowser->GetMainFrame()->ExecuteJavaScript(javascriptcode.c_str(), widget->cefBrowser->GetMainFrame()->GetURL(), 0);
+						out_jsonReturn = Json(Json::object{{"status", "Found dock and ran ExecuteJavaScript on " + widget->cefBrowser->GetMainFrame()->GetURL().ToString()}}).dump();
+					}
+
 					break;
 				}
 			}
@@ -339,28 +345,40 @@ void PluginJsHandler::JS_DOCK_NEW_BROWSER_DOCK(const json11::Json &params, std::
 
 	QMetaObject::invokeMethod(
 		mainWindow,
-		[mainWindow, objectName, title, url]() {
-			static QCef *qcef = obs_browser_init_panel();
+		[mainWindow, objectName, title, url, &out_jsonReturn]() {
 
-			obs_frontend_add_dock_by_id(objectName.c_str(), title.c_str(), nullptr);
-
-			// We have to go find the thing we just made... zzz...
+			// Check duplication
 			QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
 			foreach(QDockWidget * dock, docks)
 			{
 				if (dock->objectName().toStdString() == objectName)
 				{
-					QCefWidget *browser = qcef->create_widget(dock, url, nullptr);
-					dock->setProperty("isSlabs", true);
-					dock->setWidget(browser);
-					dock->setMinimumSize(80, 80);
-					dock->resize(460, 600);
-					dock->setFloating(false);
-					mainWindow->addDockWidget(Qt::LeftDockWidgetArea, dock);
-					dock->setVisible(true);
-					break;
+					out_jsonReturn = Json(Json::object({{"error", "Already exists"}})).dump();
+					return;
 				}
 			}
+
+			static QCef *qcef = obs_browser_init_panel();
+
+			QDockWidget *dock = new QDockWidget(mainWindow);
+			QCefWidget *browser = qcef->create_widget(dock, url, nullptr);
+			dock->setWidget(browser);
+			dock->setWindowTitle(title.c_str());
+			dock->setObjectName(objectName.c_str());
+			dock->setProperty("isSlabs", true);
+			
+			obs_frontend_add_dock(dock);
+			
+			dock->resize(460, 600);
+			dock->setMinimumSize(80, 80);
+			dock->setWindowTitle(title.c_str());
+			dock->setAllowedAreas(Qt::AllDockWidgetAreas);
+			dock->setWidget(browser);
+			
+			mainWindow->addDockWidget(Qt::LeftDockWidgetArea, dock);
+
+			// Can't use yet
+			//obs_frontend_add_dock_by_id(objectName.c_str(), title.c_str(), nullptr);
 		},
 		Qt::BlockingQueuedConnection);
 }
@@ -407,7 +425,7 @@ void PluginJsHandler::JS_DOCK_SETURL(const Json &params, std::string &out_jsonRe
 			QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
 			foreach(QDockWidget * dock, docks)
 			{
-				if (dock->objectName().toStdString() == objectName)
+				if (dock->objectName().toStdString() == objectName && dock->property("isSlabs").isValid())
 				{
 					QCefWidgetInternal *widget = (QCefWidgetInternal *)dock->widget();
 					widget->setURL(url.c_str());
@@ -458,7 +476,9 @@ void PluginJsHandler::JS_DESTROY_DOCK(const Json &params, std::string &out_jsonR
 
 	// This code is executed in the context of the QMainWindow's thread.
 	QMetaObject::invokeMethod(
-		mainWindow, [mainWindow, objectName, &out_jsonReturn]() { obs_frontend_remove_dock(objectName.c_str()); }, Qt::BlockingQueuedConnection);
+		mainWindow, [mainWindow, objectName, &out_jsonReturn]() {
+			//obs_frontend_remove_dock(objectName.c_str());
+		}, Qt::BlockingQueuedConnection);
 }
 
 void PluginJsHandler::JS_DOWNLOAD_ZIP(const Json &params, std::string &out_jsonReturn)
@@ -1004,26 +1024,21 @@ void PluginJsHandler::loadSlabsBrowserDocks()
 		std::string objectName = item["objectName"].string_value();
 
 		static QCef *qcef = obs_browser_init_panel();
-
-		obs_frontend_add_dock_by_id(objectName.c_str(), title.c_str(), nullptr);
-
-		// We have to go find the thing we just made... zzz...
-		QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
-		foreach(QDockWidget * dock, docks)
-		{
-			if (dock->objectName().toStdString() == objectName)
-			{
-
-				QCefWidget *browser = qcef->create_widget(dock, url, nullptr);
-				dock->setProperty("isSlabs", true);
-				dock->setObjectName(objectName.c_str());
-				dock->resize(460, 600);
-				dock->setMinimumSize(80, 80);
-				dock->setWindowTitle(title.c_str());
-				dock->setAllowedAreas(Qt::AllDockWidgetAreas);
-				dock->setWidget(browser);
-				break;
-			}
-		}
+		
+		QDockWidget *dock = new QDockWidget(mainWindow);
+		QCefWidget *browser = qcef->create_widget(dock, url, nullptr);
+		dock->setWidget(browser);
+		dock->setWindowTitle(title.c_str());
+		dock->setObjectName(objectName.c_str());
+		dock->setProperty("isSlabs", true);
+		dock->setObjectName(objectName.c_str());
+		
+		obs_frontend_add_dock(dock);
+		
+		dock->resize(460, 600);
+		dock->setMinimumSize(80, 80);
+		dock->setWindowTitle(title.c_str());
+		dock->setAllowedAreas(Qt::AllDockWidgetAreas);
+		dock->setWidget(browser);
 	}
 }

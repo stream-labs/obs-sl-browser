@@ -86,5 +86,10 @@ void GrpcPlugin::stop()
 	{
 		m_server->Shutdown();
 		m_server->Wait();
+		m_server.reset();
 	}
+
+	m_clientObj = nullptr;
+	m_serverObj = nullptr;
+	m_builder = nullptr;
 }

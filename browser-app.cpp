@@ -89,15 +89,8 @@ bool BrowserApp::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefRefP
 
 bool BrowserApp::Execute(const CefString &name, CefRefPtr<CefV8Value>, const CefV8ValueList &arguments, CefRefPtr<CefV8Value> &, CefString &)
 {
-	AllocConsole();
-	freopen("conin$", "r", stdin);
-	freopen("conout$", "w", stdout);
-	freopen("conout$", "w", stderr);
-	printf("Executing %s\n", name.ToString().c_str());
-
 	if (JavascriptApi::isValidFunctionName(name.ToString()))
 	{
-
 		int callBackId = 0;
 
 		if (arguments.size() >= 1 && arguments[0]->IsFunction())

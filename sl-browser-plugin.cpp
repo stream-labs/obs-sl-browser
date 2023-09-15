@@ -10,7 +10,6 @@
 
 #include "GrpcPlugin.h"
 #include "PluginJsHandler.h"
-#include "WebSocketServer.h"
 
 PROCESS_INFORMATION g_browserProcessInfo;
 
@@ -28,13 +27,13 @@ bool obs_module_load(void)
 	freopen("conout$", "w", stdout);
 	freopen("conout$", "w", stderr);
 	printf("Plugin loaded\n");
+
 	PluginJsHandler::instance().loadSlabsBrowserDocks();
 	return true;
 }
 
 void obs_module_post_load(void)
 {
-	WebSocketServer::instance().start();
 	PluginJsHandler::instance().start();
 
 	auto chooseProxyPort = []() {
@@ -125,7 +124,7 @@ void obs_module_unload(void)
 	// Might be fine to just kill it, tbd
 	// ;
 
-	WebSocketServer::instance().stop();
+	PluginJsHandler::instance().stop();
 	GrpcPlugin::instance().stop();
 
 	// Terminates the process (it shouldn't exist)

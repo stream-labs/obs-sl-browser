@@ -63,6 +63,7 @@ target_sources(
   PRIVATE main.cpp
           GrpcBrowser.cpp
           SlBrowser.cpp
+          SlBrowserWidget.cpp
           browser-app.cpp
           browser-app.hpp
           browser-client.cpp
@@ -114,7 +115,6 @@ target_sources(
   PRIVATE sl-browser-plugin.cpp
     GrpcPlugin.cpp
     PluginJsHandler.cpp
-    WebSocketServer.cpp
     deps/json11/json11.cpp
     deps/minizip/ioapi.c
     deps/minizip/iowin32.c
@@ -126,15 +126,11 @@ target_sources(
 )
     
 target_link_libraries(sl-browser-plugin PRIVATE ZLIB::ZLIB)
-target_link_libraries(sl-browser-plugin PRIVATE CEF::Wrapper CEF::Library)
 target_link_libraries(sl-browser-plugin PRIVATE Qt::Widgets)
 target_link_libraries(sl-browser-plugin PRIVATE Qt::Core)
 target_link_libraries(sl-browser-plugin PRIVATE Qt::Gui)
 target_link_libraries(sl-browser-plugin PRIVATE Qt::Svg)
-target_link_libraries(sl-browser-plugin PRIVATE ${LIBWEBSOCKETS_LIB})
 
-target_include_directories(sl-browser-plugin PRIVATE ${LIBWEBSOCKETS_INCLUDE})
-target_include_directories(sl-browser-plugin PRIVATE ${LIBWEBSOCKETS_INCLUDE})
 target_include_directories(sl-browser-plugin PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/deps")
 target_include_directories(sl-browser-plugin PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/deps/json11")
 target_include_directories(sl-browser-plugin PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../obs-browser/panel")

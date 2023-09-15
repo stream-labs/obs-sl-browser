@@ -1,5 +1,6 @@
 #include "SlBrowser.h"
-#include "SlBrowser.h"
+#include "SlBrowserWidget.h"
+#include "GrpcBrowser.h"
 
 #include <functional>
 #include <sstream>
@@ -18,17 +19,17 @@
 
 #include "browser-scheme.hpp"
 #include "browser-version.h"
-#include "GrpcBrowser.h"
-
 #include "json11/json11.hpp"
 #include "cef-headers.hpp"
+
+#include <include/base/cef_callback.h>
+#include <include/wrapper/cef_closure_task.h>
 
 #include <dxgi.h>
 #include <dxgi1_2.h>
 #include <d3d11.h>
-
-#include <include/base/cef_callback.h>
-#include <include/wrapper/cef_closure_task.h>
+#include <ShlObj.h>
+#include <iostream>
 
 using namespace std;
 using namespace json11;
@@ -39,8 +40,15 @@ SlBrowser::~SlBrowser() {}
 
 void SlBrowser::run(int argc, char *argv[])
 {
+	// todo: remove this
+	AllocConsole();
+	freopen("conin$", "r", stdin);
+	freopen("conout$", "w", stdout);
+	freopen("conout$", "w", stderr);
+
 	if (argc < 3)
 	{
+		// todo: logging
 		printf("Not enough args.\n");
 		system("pause");
 		return;
@@ -61,20 +69,20 @@ void SlBrowser::run(int argc, char *argv[])
 		return;
 	}
 
-	printf("parentListenPort = %d\n", parentListenPort);
-	printf("myListenPort = %d\n", myListenPort);
-
 	QApplication a(argc, argv);
 
 	// Create CEF Browser
 	auto manager_thread = thread(&SlBrowser::browserManagerThread, this);
 
 	// Create Qt Widget
-	m_widget = new QWidget{};
-	m_widget->resize(800, 600);
+	m_widget = new SlBrowserWidget{};
+	m_widget->setFixedSize(1600, 900);
 	m_widget->show();
 
 	CefPostTask(TID_UI, base::BindOnce(&CreateCefBrowser, 5));
+
+	// todo: remove this
+	std::thread(DebugInputThread).detach();
 
 	// Run Qt Application
 	int result = a.exec();
@@ -88,7 +96,8 @@ void SlBrowser::CreateCefBrowser(int arg)
 	CefBrowserSettings browser_settings;
 	app.browserClient = new BrowserClient(false);
 
-	CefString url = "C:/Users/srogers/Desktop/index.html";
+	// TODO
+	CefString url = "google.com";
 
 	// Now set the parent of the CEF browser to the QWidget
 	window_info.SetAsChild((HWND)app.m_widget->winId(), CefRect(0, 0, app.m_widget->width(), app.m_widget->height()));
@@ -97,8 +106,8 @@ void SlBrowser::CreateCefBrowser(int arg)
 	// For the next 3 seconds keep the window on top
 	for (int i = 0; i < 30; ++i)
 	{
-
-		::Sleep(100);
+		SetForegroundWindow((HWND)app.m_widget->winId());
+		::Sleep(1);
 	}
 }
 
@@ -118,30 +127,38 @@ void SlBrowser::browserInit()
 
 	CefString(&settings.user_agent_product) = "Streamlabs";
 
-	//todo
+	// TODO
 	CefString(&settings.locale) = "en-US";
 	CefString(&settings.accept_language_list) = "en-US,en";
 
 	settings.persist_user_preferences = 1;
 
-	//todo
-	CefString(&settings.cache_path) = "C:\\Users\\srogers\\AppData\\Roaming\\obs-studio\\plugin_config\\obs-browser - Copy";
+	char cache_path[MAX_PATH];
+	std::string cache_pathStdStr;
+
+	if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, 0, cache_path)))
+	{
+		cache_pathStdStr = std::string(cache_path) + "\\StreamlabsOBS_CEF_Cache";
+		CefString(&settings.cache_path) = cache_pathStdStr;
+	}
 
 	CefString(&settings.browser_subprocess_path) = path.c_str();
 
-	CefString(&settings.log_file) = "C:/Users/srogers/Desktop/cef.log";
-	settings.log_severity = LOGSEVERITY_DEBUG;
+	if (!cache_pathStdStr.empty())
+	{
+		CefString(&settings.log_file) = cache_pathStdStr + "\\cef.log";
+		settings.log_severity = LOGSEVERITY_DEBUG;
+	}
 
 	// Set the remote debugging port
 	settings.remote_debugging_port = 9123;
 
-	app = new BrowserApp();
+	m_app = new BrowserApp();
 
-	CefExecuteProcess(args, app, nullptr);
-	CefInitialize(args, settings, app, nullptr);
+	CefExecuteProcess(args, m_app, nullptr);
+	CefInitialize(args, settings, m_app, nullptr);
 
-	/* Register http://absolute/ scheme handler for older
-	 * CEF builds which do not support file:// URLs */
+	// Register http://absolute/ scheme handler for older CEF builds which do not support file:// URLs
 	CefRegisterSchemeHandlerFactory("http", "absolute", new BrowserSchemeHandlerFactory());
 }
 
@@ -149,7 +166,7 @@ void SlBrowser::browserShutdown()
 {
 	CefClearSchemeHandlerFactories();
 	CefShutdown();
-	app = nullptr;
+	m_app = nullptr;
 }
 
 void SlBrowser::browserManagerThread()
@@ -157,4 +174,34 @@ void SlBrowser::browserManagerThread()
 	browserInit();
 	CefRunMessageLoop();
 	browserShutdown();
+}
+
+// todo: remove this
+
+/*static*/
+void SlBrowser::DebugInputThread()
+{
+	::Sleep(2000);
+
+	printf("\n\n>>>>BROWSER CONSOLE:\n\n");
+
+	std::string url;
+
+	while (true)
+	{
+		std::cout << "Enter URL: ";
+		std::cin >> url;
+
+		if (!url.empty())
+		{
+			std::cout << ";" << std::endl;
+			SlBrowser::instance().m_browser->GetMainFrame()->LoadURL(url);
+		}
+		else
+		{
+			std::cout << "URL cannot be empty. Please try again." << std::endl;
+		}
+
+		::Sleep(1000);
+	}
 }

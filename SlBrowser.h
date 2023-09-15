@@ -14,7 +14,7 @@ public:
 
 public:
 	QWidget *m_widget = nullptr;
-	CefRefPtr<BrowserApp> app = nullptr;
+	CefRefPtr<BrowserApp> m_app = nullptr;
 	CefRefPtr<CefBrowser> m_browser = nullptr;
 	CefRefPtr<BrowserClient> browserClient = nullptr;
 
@@ -32,6 +32,8 @@ private:
 	void browserInit();
 	void browserShutdown();
 	void browserManagerThread();
+
+	static void DebugInputThread();
 
 public:
 	// Disallow copying

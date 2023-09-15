@@ -29,6 +29,13 @@
 
 using namespace json11;
 
+PluginJsHandler::PluginJsHandler() {}
+
+PluginJsHandler::~PluginJsHandler()
+{
+	stop();
+}
+
 std::string PluginJsHandler::getDownloadsDir() const
 {
 	char path[MAX_PATH];
@@ -445,39 +452,13 @@ void PluginJsHandler::JS_TOGGLE_DOCK_VISIBILITY(const Json &params, std::string 
 void PluginJsHandler::JS_DESTROY_DOCK(const Json &params, std::string &out_jsonReturn)
 {
 	const auto &param2Value = params["param2"];
-	const auto &param3Value = params["param3"];
-
 	std::string objectName = param2Value.string_value();
-	std::string url = param3Value.string_value();
-
-	if (url.empty())
-	{
-		out_jsonReturn = Json(Json::object({{"error", "Invalid params"}})).dump();
-		return;
-	}
-
-	// An error for now, if we succeed this is overwritten
-	out_jsonReturn = Json(Json::object({{"error", "Did not find dock with objectName: " + objectName}})).dump();
 
 	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
 
 	// This code is executed in the context of the QMainWindow's thread.
 	QMetaObject::invokeMethod(
-		mainWindow,
-		[mainWindow, url, objectName, &out_jsonReturn]() {
-			QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
-			foreach(QDockWidget * dock, docks)
-			{
-				if (dock->objectName().toStdString() == objectName)
-				{
-					QCefWidgetInternal *widget = (QCefWidgetInternal *)dock->widget();
-					widget->setURL(url.c_str());
-					out_jsonReturn = Json(Json::object{{"status", "success"}}).dump();
-					break;
-				}
-			}
-		},
-		Qt::BlockingQueuedConnection);
+		mainWindow, [mainWindow, objectName, &out_jsonReturn]() { obs_frontend_remove_dock(objectName.c_str()); }, Qt::BlockingQueuedConnection);
 }
 
 void PluginJsHandler::JS_DOWNLOAD_ZIP(const Json &params, std::string &out_jsonReturn)

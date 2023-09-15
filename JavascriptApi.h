@@ -50,7 +50,6 @@ public:
 			{"dock_executeJavascript", JS_DOCK_EXECUTEJAVASCRIPT},
 
 			// .(@objectName, @bool_visible)
-			//	Only works on docks we've created
 			{"dock_toggleBrowserDockVisibility", JS_TOGGLE_DOCK_VISIBILITY},
 
 			// .(@objectName)

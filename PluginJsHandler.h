@@ -25,6 +25,9 @@ public:
 	}
 
 private:
+	PluginJsHandler();
+	~PluginJsHandler();
+
 	void workerThread();
 
 	void JS_QUERY_DOCKS(const json11::Json &params, std::string &out_jsonReturn);

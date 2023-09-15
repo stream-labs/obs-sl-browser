@@ -53,82 +53,6 @@ void PluginJsHandler::stop()
 		m_workerThread.join();
 }
 
-void PluginJsHandler::loadSlabsBrowserDocks()
-{
-	const char *jsonStr = config_get_string(obs_frontend_get_global_config(), "BasicWindow", "SlabsBrowserDocks");
-
-	std::string err;
-	Json json = Json::parse(jsonStr, err);
-	if (!err.empty())
-		return;
-
-	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
-
-	Json::array array = json.array_items();
-
-	for (Json &item : array) {
-		std::string title = item["title"].string_value();
-		std::string url = item["url"].string_value();
-		std::string sl_uuid = item["sl_uuid"].string_value();
-				
-		static QCef *qcef = obs_browser_init_panel();
-		std::string objectName = (SL_DOCK_PREFIX + sl_uuid);
-
-		obs_frontend_add_dock_by_id(objectName.c_str(), title.c_str(), nullptr);
-
-		// We have to go find the thing we just made... zzz...
-		QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
-		foreach(QDockWidget* dock, docks)
-		{
-			if (dock->objectName().toStdString() == objectName) {
-
-				QCefWidget *browser = qcef->create_widget(dock, url, nullptr);
-				dock->setObjectName(title + SL_DOCK_PREFIX);
-				dock->resize(460, 600);
-				dock->setMinimumSize(80, 80);
-				dock->setWindowTitle(title.c_str());
-				dock->setAllowedAreas(Qt::AllDockWidgetAreas);
-				dock->setWidget(browser);
-				break;
-			}
-		}
-	}
-}
-
-void PluginJsHandler::saveSlabsBrowserDocks()
-{
-	Json::array jarray;
-	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
-	QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
-
-	foreach(QDockWidget * dock, docks)
-	{
-		std::string dockName = dock->objectName().toStdString();
-
-		if (dockName.find(SL_DOCK_PREFIX) != std::string::npos)
-		{
-			QCefWidgetInternal *widget = (QCefWidgetInternal *)dock->widget();
-
-			std::string url;
-			std::string sl_uuid = dockName.substr(dockName.find(SL_DOCK_PREFIX) + strlen(SL_DOCK_PREFIX));
-
-			if (widget->cefBrowser != nullptr)
-				url = widget->cefBrowser->GetMainFrame()->GetURL();
-
-			Json::object obj{
-				{"title", dock->windowTitle().toStdString()},
-				{"url", url},
-				{"sl_uuid", sl_uuid},
-			};
-
-			jarray.push_back(obj);
-		}
-	}
-
-	std::string output = Json(jarray).dump();
-	config_set_string(obs_frontend_get_global_config(), "BasicWindow", "ExtraBrowserDocks", output.c_str());
-}
-
 void PluginJsHandler::pushApiRequest(const std::string &funcName, const std::string &params)
 {
 	std::lock_guard<std::mutex> grd(m_queueMtx);
@@ -137,7 +61,8 @@ void PluginJsHandler::pushApiRequest(const std::string &funcName, const std::str
 
 void PluginJsHandler::workerThread()
 {
-	while (m_running) {
+	while (m_running)
+	{
 		std::vector<std::pair<std::string, std::string>> latestBatch;
 
 		{
@@ -145,17 +70,20 @@ void PluginJsHandler::workerThread()
 			latestBatch.swap(m_queudRequests);
 		}
 
-		if (latestBatch.empty()) {
+		if (latestBatch.empty())
+		{
 			using namespace std::chrono;
 			std::this_thread::sleep_for(1ms);
-		} else {
+		}
+		else
+		{
 			for (auto &itr : latestBatch)
 				executeApiRequest(itr.first, itr.second);
 		}
 	}
 }
 
-void PluginJsHandler::executeApiRequest(const std::string& funcName, const std::string& params)
+void PluginJsHandler::executeApiRequest(const std::string &funcName, const std::string &params)
 {
 	std::string err;
 	Json jsonParams = Json::parse(params, err);
@@ -175,10 +103,11 @@ void PluginJsHandler::executeApiRequest(const std::string& funcName, const std::
 	}
 
 	blog(LOG_INFO, "executeApiRequest (start) %s: %s\n", funcName.c_str(), params.c_str());
-	
+
 	std::string jsonReturnStr;
 
-	switch (JavascriptApi::getFunctionId(funcName)) {
+	switch (JavascriptApi::getFunctionId(funcName))
+	{
 	case JavascriptApi::JS_DOCK_EXECUTEJAVASCRIPT: {
 		JS_DOCK_EXECUTEJAVASCRIPT(jsonParams, jsonReturnStr);
 		break;
@@ -238,7 +167,7 @@ void PluginJsHandler::executeApiRequest(const std::string& funcName, const std::
 	}
 
 	blog(LOG_INFO, "executeApiRequest (finish) %s: %s\n", funcName.c_str(), jsonReturnStr.c_str());
-	
+
 	// We're done, send callback
 	if (param1Value.int_value() > 0)
 		GrpcPlugin::instance().getClient()->send_executeCallback(param1Value.int_value(), jsonReturnStr);
@@ -256,8 +185,8 @@ void PluginJsHandler::JS_QUERY_DOCKS(const Json &params, std::string &out_jsonRe
 			QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
 			foreach(QDockWidget * dock, docks)
 			{
+				bool isSlabs = false;
 				std::string name = dock->objectName().toStdString();
-				std::string sl_uuid;
 				std::string url;
 
 				// Translate the global coordinates to coordinates relative to the main window
@@ -272,20 +201,19 @@ void PluginJsHandler::JS_QUERY_DOCKS(const Json &params, std::string &out_jsonRe
 
 				std::string dockName = dock->objectName().toStdString();
 
-				if (dockName.find(SL_DOCK_PREFIX) != std::string::npos)
+				if (dock->property("isSlabs").isValid())
 				{
-					sl_uuid = dockName.substr(dockName.find(SL_DOCK_PREFIX) + strlen(SL_DOCK_PREFIX));
+					isSlabs = true;
 					QCefWidgetInternal *widget = (QCefWidgetInternal *)dock->widget();
 
-					if (widget->cefBrowser != nullptr) {
+					if (widget->cefBrowser != nullptr)
+					{
 						url = widget->cefBrowser->GetMainFrame()->GetURL();
 					}
 				}
 
 				// Create a Json object for this dock widget and add it to the panelInfo vector
-				dockInfo.push_back(Json::object{
-					{"name", name}, {"x", x}, {"y", y}, {"width", width}, {"height", height}, {"floating", floating}, {"sl_uuid", sl_uuid}, {"url", url}}
-				);
+				dockInfo.push_back(Json::object{{"name", name}, {"x", x}, {"y", y}, {"width", width}, {"height", height}, {"floating", floating}, {"isSlabs", isSlabs}, {"url", url}});
 			}
 
 			// Convert the panelInfo vector to a Json object and dump string
@@ -302,22 +230,25 @@ void PluginJsHandler::JS_DOCK_SETAREA(const Json &params, std::string &out_jsonR
 	const auto &param4Value = params["param4"];
 	const auto &param5Value = params["param5"];
 
-	std::string sl_uuid = param2Value.string_value();
+	std::string objectName = param2Value.string_value();
 	int areaMask = param3Value.int_value();
 	int resizeX = param4Value.int_value();
 	int resizeY = param5Value.int_value();
+
+	// An error for now, if we succeed this is overwritten
+	out_jsonReturn = Json(Json::object({{"error", "Did not find dock with objectName: " + objectName}})).dump();
 
 	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
 
 	QMetaObject::invokeMethod(
 		mainWindow,
-		[mainWindow, sl_uuid, areaMask, resizeX, resizeY, &params, &out_jsonReturn]() {
-
+		[mainWindow, objectName, areaMask, resizeX, resizeY, &params, &out_jsonReturn]() {
 			// Find the panel by name (assuming the name is stored as a property)
 			QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
 			foreach(QDockWidget * dock, docks)
 			{
-				if (dock->objectName().toStdString() == SL_DOCK_PREFIX + sl_uuid) {
+				if (dock->objectName().toStdString() == objectName)
+				{
 
 					// Map the input area mask to the corresponding Qt::DockWidgetArea
 					Qt::DockWidgetArea dockArea = static_cast<Qt::DockWidgetArea>(areaMask & Qt::DockWidgetArea_Mask);
@@ -326,13 +257,10 @@ void PluginJsHandler::JS_DOCK_SETAREA(const Json &params, std::string &out_jsonR
 					if (resizeX > 0 && resizeY > 0)
 						dock->resize(resizeX, resizeY);
 
+					out_jsonReturn = Json(Json::object{{"status", "success"}}).dump();
 					break;
 				}
 			}
-
-			// Build a response JSON object (modify as necessary)
-			Json ret = Json::object{{"status", "success"}};
-			out_jsonReturn = ret.dump();
 		},
 		Qt::BlockingQueuedConnection);
 }
@@ -342,46 +270,46 @@ void PluginJsHandler::JS_DOCK_EXECUTEJAVASCRIPT(const Json &params, std::string 
 	const auto &param2Value = params["param2"];
 	const auto &param3Value = params["param3"];
 
-	std::string javascriptcode = param2Value.string_value();
-	std::string sl_uuid = param3Value.string_value();
+	std::string objectName = param2Value.string_value();
+	std::string javascriptcode = param3Value.string_value();
 
-	if (javascriptcode.empty() || sl_uuid.empty()) {
+	if (javascriptcode.empty())
+	{
 		out_jsonReturn = Json(Json::object({{"error", "Invalid params"}})).dump();
 		return;
 	}
+
+	// An error for now, if we succeed this is overwritten
+	out_jsonReturn = Json(Json::object({{"error", "Did not find dock with objectName: " + objectName}})).dump();
 
 	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
 
 	// This code is executed in the context of the QMainWindow's thread.
 	QMetaObject::invokeMethod(
 		mainWindow,
-		[mainWindow, javascriptcode, sl_uuid, &out_jsonReturn]() {
+		[mainWindow, javascriptcode, objectName, &out_jsonReturn]() {
 			QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
 			foreach(QDockWidget * dock, docks)
 			{
-				if (dock->objectName().toStdString() == SL_DOCK_PREFIX + sl_uuid) {
+				if (dock->objectName().toStdString() == objectName)
+				{
 					QCefWidgetInternal *widget = (QCefWidgetInternal *)dock->widget();
 					widget->executeJavaScript(javascriptcode.c_str());
-					return;
+					out_jsonReturn = Json(Json::object{{"status", "success"}}).dump();
+					break;
 				}
 			}
-
-			out_jsonReturn = Json(Json::object({{"error", "Dock '" + sl_uuid + "' not found."}})).dump();
 		},
 		Qt::BlockingQueuedConnection);
 }
 
-void PluginJsHandler::JS_TOGGLE_USER_INPUT(const json11::Json& params, std::string& out_jsonReturn)
+void PluginJsHandler::JS_TOGGLE_USER_INPUT(const json11::Json &params, std::string &out_jsonReturn)
 {
 	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
 	bool enable = params["param2"].bool_value();
 
 	QMetaObject::invokeMethod(
-		mainWindow,
-		[mainWindow, enable]() {
-			::EnableWindow(reinterpret_cast<HWND>(mainWindow->winId()), enable);
-		},
-		Qt::BlockingQueuedConnection);
+		mainWindow, [mainWindow, enable]() { ::EnableWindow(reinterpret_cast<HWND>(mainWindow->winId()), enable); }, Qt::BlockingQueuedConnection);
 }
 
 void PluginJsHandler::JS_DOCK_NEW_BROWSER_DOCK(const json11::Json &params, std::string &out_jsonReturn)
@@ -394,28 +322,29 @@ void PluginJsHandler::JS_DOCK_NEW_BROWSER_DOCK(const json11::Json &params, std::
 
 	std::string title = param2Value.string_value();
 	std::string url = param3Value.string_value();
-	std::string sl_uuid = param4Value.string_value();
+	std::string objectName = param4Value.string_value();
 
-	if (sl_uuid.empty() || title.empty() || url.empty()) {
+	if (objectName.empty() || title.empty() || url.empty())
+	{
 		out_jsonReturn = Json(Json::object({{"error", "Invalid params"}})).dump();
 		return;
 	}
 
 	QMetaObject::invokeMethod(
 		mainWindow,
-		[mainWindow, sl_uuid, title, url]() {
+		[mainWindow, objectName, title, url]() {
 			static QCef *qcef = obs_browser_init_panel();
-			std::string objectName = (SL_DOCK_PREFIX + sl_uuid);
 
 			obs_frontend_add_dock_by_id(objectName.c_str(), title.c_str(), nullptr);
 
-			// We have to go find the thing we just made... zzz...			
+			// We have to go find the thing we just made... zzz...
 			QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
 			foreach(QDockWidget * dock, docks)
 			{
-				if (dock->objectName().toStdString() == objectName) {
-
+				if (dock->objectName().toStdString() == objectName)
+				{
 					QCefWidget *browser = qcef->create_widget(dock, url, nullptr);
+					dock->setProperty("isSlabs", true);
 					dock->setWidget(browser);
 					dock->setMinimumSize(80, 80);
 					dock->resize(460, 600);
@@ -439,7 +368,7 @@ void PluginJsHandler::JS_GET_MAIN_WINDOW_GEOMETRY(const Json &params, std::strin
 			int x = mainWindow->geometry().x();
 			int y = mainWindow->geometry().y();
 			int width = mainWindow->width();
-			int height = mainWindow->height();			
+			int height = mainWindow->height();
 			out_jsonReturn = Json(Json::object{{{"x", x}, {"y", y}, {"width", width}, {"height", height}}}).dump();
 		},
 		Qt::BlockingQueuedConnection);
@@ -450,46 +379,116 @@ void PluginJsHandler::JS_DOCK_SETURL(const Json &params, std::string &out_jsonRe
 	const auto &param2Value = params["param2"];
 	const auto &param3Value = params["param3"];
 
-	std::string url = param2Value.string_value();
-	std::string sl_uuid = param3Value.string_value();
+	std::string objectName = param2Value.string_value();
+	std::string url = param3Value.string_value();
 
-	if (url.empty() || sl_uuid.empty()) {
+	if (url.empty())
+	{
 		out_jsonReturn = Json(Json::object({{"error", "Invalid params"}})).dump();
 		return;
 	}
 
+	// An error for now, if we succeed this is overwritten
+	out_jsonReturn = Json(Json::object({{"error", "Did not find dock with objectName: " + objectName}})).dump();
+
 	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
 
 	// This code is executed in the context of the QMainWindow's thread.
-	QMetaObject::invokeMethod(mainWindow,
-		[mainWindow, url, sl_uuid, &out_jsonReturn]() {
-			
+	QMetaObject::invokeMethod(
+		mainWindow,
+		[mainWindow, url, objectName, &out_jsonReturn]() {
 			QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
 			foreach(QDockWidget * dock, docks)
 			{
-				if (dock->objectName().toStdString() == SL_DOCK_PREFIX + sl_uuid) {
+				if (dock->objectName().toStdString() == objectName)
+				{
 					QCefWidgetInternal *widget = (QCefWidgetInternal *)dock->widget();
 					widget->setURL(url.c_str());
-					return;
+					out_jsonReturn = Json(Json::object{{"status", "success"}}).dump();
+					break;
 				}
 			}
+		},
+		Qt::BlockingQueuedConnection);
+}
 
-			out_jsonReturn = Json(Json::object({{"error", "Dock '" + sl_uuid + "' not found."}})).dump();
+void PluginJsHandler::JS_TOGGLE_DOCK_VISIBILITY(const Json &params, std::string &out_jsonReturn)
+{
+	const auto &param2Value = params["param2"];
+	const auto &param3Value = params["param3"];
+
+	std::string objectName = param2Value.string_value();
+	bool visible = param3Value.bool_value();
+
+	// An error for now, if we succeed this is overwritten
+	out_jsonReturn = Json(Json::object({{"error", "Did not find dock with objectName: " + objectName}})).dump();
+
+	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
+
+	// This code is executed in the context of the QMainWindow's thread.
+	QMetaObject::invokeMethod(
+		mainWindow,
+		[mainWindow, visible, objectName, &out_jsonReturn]() {
+			QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
+			foreach(QDockWidget * dock, docks)
+			{
+				if (dock->objectName().toStdString() == objectName)
+				{
+					dock->setVisible(visible);
+					break;
+				}
+			}
+		},
+		Qt::BlockingQueuedConnection);
+}
+
+void PluginJsHandler::JS_DESTROY_DOCK(const Json &params, std::string &out_jsonReturn)
+{
+	const auto &param2Value = params["param2"];
+	const auto &param3Value = params["param3"];
+
+	std::string objectName = param2Value.string_value();
+	std::string url = param3Value.string_value();
+
+	if (url.empty())
+	{
+		out_jsonReturn = Json(Json::object({{"error", "Invalid params"}})).dump();
+		return;
+	}
+
+	// An error for now, if we succeed this is overwritten
+	out_jsonReturn = Json(Json::object({{"error", "Did not find dock with objectName: " + objectName}})).dump();
+
+	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
+
+	// This code is executed in the context of the QMainWindow's thread.
+	QMetaObject::invokeMethod(
+		mainWindow,
+		[mainWindow, url, objectName, &out_jsonReturn]() {
+			QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
+			foreach(QDockWidget * dock, docks)
+			{
+				if (dock->objectName().toStdString() == objectName)
+				{
+					QCefWidgetInternal *widget = (QCefWidgetInternal *)dock->widget();
+					widget->setURL(url.c_str());
+					out_jsonReturn = Json(Json::object{{"status", "success"}}).dump();
+					break;
+				}
+			}
 		},
 		Qt::BlockingQueuedConnection);
 }
 
 void PluginJsHandler::JS_DOWNLOAD_ZIP(const Json &params, std::string &out_jsonReturn)
 {
-	auto downloadFile = [](const std::string &url, const std::string &filename)
-	{
+	auto downloadFile = [](const std::string &url, const std::string &filename) {
 		HINTERNET connect = InternetOpenA("Streamlabs", INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
 
 		if (!connect)
 			return false;
 
-		HINTERNET hOpenAddress =
-			InternetOpenUrlA(connect, url.c_str(), NULL, 0, INTERNET_FLAG_PRAGMA_NOCACHE | INTERNET_FLAG_KEEP_CONNECTION, 0);
+		HINTERNET hOpenAddress = InternetOpenUrlA(connect, url.c_str(), NULL, 0, INTERNET_FLAG_PRAGMA_NOCACHE | INTERNET_FLAG_KEEP_CONNECTION, 0);
 
 		if (!hOpenAddress)
 		{
@@ -540,10 +539,10 @@ void PluginJsHandler::JS_DOWNLOAD_ZIP(const Json &params, std::string &out_jsonR
 		return true;
 	};
 
-	auto unzip = [](const std::string &filepath, std::vector<std::string> &output)
-	{
+	auto unzip = [](const std::string &filepath, std::vector<std::string> &output) {
 		unzFile zipFile = unzOpen(filepath.c_str());
-		if (!zipFile) {
+		if (!zipFile)
+		{
 			blog(LOG_ERROR, "Unable to open zip file: %s", filepath.c_str());
 			return;
 		}
@@ -552,16 +551,19 @@ void PluginJsHandler::JS_DOWNLOAD_ZIP(const Json &params, std::string &out_jsonR
 		char buffer[4096];
 
 		unz_global_info globalInfo;
-		if (unzGetGlobalInfo(zipFile, &globalInfo) != UNZ_OK) {
+		if (unzGetGlobalInfo(zipFile, &globalInfo) != UNZ_OK)
+		{
 			blog(LOG_ERROR, "Could not read file global info: %s", filepath.c_str());
 			unzClose(zipFile);
 			return;
 		}
 
-		for (uLong i = 0; i < globalInfo.number_entry; ++i) {
+		for (uLong i = 0; i < globalInfo.number_entry; ++i)
+		{
 			unz_file_info fileInfo;
 			char filename[256];
-			if (unzGetCurrentFileInfo(zipFile, &fileInfo, filename, 256, NULL, 0, NULL, 0) != UNZ_OK) {
+			if (unzGetCurrentFileInfo(zipFile, &fileInfo, filename, 256, NULL, 0, NULL, 0) != UNZ_OK)
+			{
 				blog(LOG_ERROR, "Could not read file info: %s", filepath.c_str());
 				unzClose(zipFile);
 				return;
@@ -570,9 +572,12 @@ void PluginJsHandler::JS_DOWNLOAD_ZIP(const Json &params, std::string &out_jsonR
 			const std::string fullOutputPath = outputDir.string() + '/' + filename;
 
 			// If the file in the zip archive is a directory, continue to next file
-			if (filename[strlen(filename) - 1] == '/') {
-				if ((i + 1) < globalInfo.number_entry) {
-					if (unzGoToNextFile(zipFile) != UNZ_OK) {
+			if (filename[strlen(filename) - 1] == '/')
+			{
+				if ((i + 1) < globalInfo.number_entry)
+				{
+					if (unzGoToNextFile(zipFile) != UNZ_OK)
+					{
 						blog(LOG_ERROR, "Could not read next file: %s", filepath.c_str());
 						unzClose(zipFile);
 						return;
@@ -581,7 +586,8 @@ void PluginJsHandler::JS_DOWNLOAD_ZIP(const Json &params, std::string &out_jsonR
 				continue;
 			}
 
-			if (unzOpenCurrentFile(zipFile) != UNZ_OK) {
+			if (unzOpenCurrentFile(zipFile) != UNZ_OK)
+			{
 				blog(LOG_ERROR, "Could not open current file: %s", filepath.c_str());
 				unzClose(zipFile);
 				return;
@@ -589,19 +595,23 @@ void PluginJsHandler::JS_DOWNLOAD_ZIP(const Json &params, std::string &out_jsonR
 
 			// Create necessary directories
 			std::filesystem::path pathToFile(fullOutputPath);
-			if (fileInfo.uncompressed_size > 0) {
+			if (fileInfo.uncompressed_size > 0)
+			{
 				std::filesystem::create_directories(pathToFile.parent_path());
 			}
 
 			std::ofstream outFile(fullOutputPath, std::ios::binary);
 			int error = UNZ_OK;
-			do {
+			do
+			{
 				error = unzReadCurrentFile(zipFile, buffer, sizeof(buffer));
-				if (error < 0) {
+				if (error < 0)
+				{
 					blog(LOG_ERROR, "Error %d with zipfile in unzReadCurrentFile: %s", error, filepath.c_str());
 					break;
 				}
-				if (error > 0) {
+				if (error > 0)
+				{
 					outFile.write(buffer, error);
 				}
 			} while (error > 0);
@@ -611,12 +621,15 @@ void PluginJsHandler::JS_DOWNLOAD_ZIP(const Json &params, std::string &out_jsonR
 			// Adding the file path to the output vector
 			output.push_back(fullOutputPath);
 
-			if (unzCloseCurrentFile(zipFile) != UNZ_OK) {
+			if (unzCloseCurrentFile(zipFile) != UNZ_OK)
+			{
 				blog(LOG_ERROR, "Could not close file: %s", filepath.c_str());
 			}
 
-			if ((i + 1) < globalInfo.number_entry) {
-				if (unzGoToNextFile(zipFile) != UNZ_OK) {
+			if ((i + 1) < globalInfo.number_entry)
+			{
+				if (unzGoToNextFile(zipFile) != UNZ_OK)
+				{
 					blog(LOG_ERROR, "Could not read next file: %s", filepath.c_str());
 					unzClose(zipFile);
 					return;
@@ -626,7 +639,7 @@ void PluginJsHandler::JS_DOWNLOAD_ZIP(const Json &params, std::string &out_jsonR
 
 		unzClose(zipFile);
 	};
-	
+
 	const auto &param2Value = params["param2"];
 	std::string url = param2Value.string_value();
 	std::string folderPath = getDownloadsDir();
@@ -641,7 +654,7 @@ void PluginJsHandler::JS_DOWNLOAD_ZIP(const Json &params, std::string &out_jsonR
 		auto millis = duration_cast<milliseconds>(duration).count();
 		std::string millis_str = std::to_string(millis);
 
-		// ThreadID + MsTime should be unique, same threaID within 1ms window is a statistical improbability 
+		// ThreadID + MsTime should be unique, same threaID within 1ms window is a statistical improbability
 		std::string subFolderPath = folderPath + "\\" + std::to_string(GetCurrentThreadId()) + millis_str;
 		std::string zipFilepath = subFolderPath + "\\download.zip";
 
@@ -655,8 +668,9 @@ void PluginJsHandler::JS_DOWNLOAD_ZIP(const Json &params, std::string &out_jsonR
 
 			// Build json string now
 			Json::array json_array;
-    
-			for (const auto& filepath : filepaths) {
+
+			for (const auto &filepath : filepaths)
+			{
 				Json::object obj;
 				obj["path"] = filepath;
 				json_array.push_back(obj);
@@ -689,29 +703,36 @@ void PluginJsHandler::JS_READ_FILE(const Json &params, std::string &out_jsonRetu
 
 	Json ret;
 
-	if (file) {
-		try {
+	if (file)
+	{
+		try
+		{
 
 			// Get the file size
 			std::streamsize fileSize = file.tellg();
 			file.seekg(0, std::ios::beg);
 
 			// Check if file size is 1MB or higher
-			if (fileSize >= 1048576) {
+			if (fileSize >= 1048576)
+			{
 				ret = Json::object({{"error", "File size is 1MB or higher"}});
-			} else {
+			}
+			else
+			{
 				std::stringstream buffer;
 				buffer << file.rdbuf();
 				filecontents = buffer.str();
 				ret = Json::object({{"contents", filecontents}});
 			}
-		} catch (...) {
-			ret = Json::object(
-				{{"error", "Unable to read file. Checking for windows errors: '" + std::to_string(GetLastError()) + "'"}});
 		}
-	} else {
-		ret = Json::object(
-			{{"error", "Unable to open file. Checking for windows errors: '" + std::to_string(GetLastError()) + "'"}});
+		catch (...)
+		{
+			ret = Json::object({{"error", "Unable to read file. Checking for windows errors: '" + std::to_string(GetLastError()) + "'"}});
+		}
+	}
+	else
+	{
+		ret = Json::object({{"error", "Unable to open file. Checking for windows errors: '" + std::to_string(GetLastError()) + "'"}});
 	}
 
 	out_jsonReturn = ret.dump();
@@ -728,15 +749,18 @@ void PluginJsHandler::JS_DELETE_FILES(const Json &params, std::string &out_jsonR
 	std::string err;
 	Json jsonArray = Json::parse(params["param2"].string_value().c_str(), err);
 
-	if (!err.empty()) {
+	if (!err.empty())
+	{
 		out_jsonReturn = Json(Json::object({{"error", "Invalid parameter: " + err}})).dump();
 		return;
 	}
 
 	const auto &filepaths = jsonArray.array_items();
 
-	for (const auto &filepathJson : filepaths) {
-		if (filepathJson.is_object()) {
+	for (const auto &filepathJson : filepaths)
+	{
+		if (filepathJson.is_object())
+		{
 			const auto &filepath = filepathJson["path"].string_value();
 
 			std::filesystem::path downloadsDir = std::filesystem::path(getDownloadsDir());
@@ -744,20 +768,29 @@ void PluginJsHandler::JS_DELETE_FILES(const Json &params, std::string &out_jsonR
 			std::filesystem::path normalizedPath = fullPath.lexically_normal();
 
 			// Check if filepath contains relative components that move outside the downloads directory
-			if (normalizedPath.string().find(downloadsDir.string()) != 0) {
+			if (normalizedPath.string().find(downloadsDir.string()) != 0)
+			{
 				errors.push_back("Invalid path: " + filepath);
-			} else {
-				try {
-					if (std::filesystem::exists(normalizedPath)) {
+			}
+			else
+			{
+				try
+				{
+					if (std::filesystem::exists(normalizedPath))
+					{
 						std::filesystem::remove(normalizedPath);
 						success.push_back(filepath);
-					} else {
+					}
+					else
+					{
 						errors.push_back("File not found: " + filepath);
 					}
-				} catch (const std::filesystem::filesystem_error &e) {
+				}
+				catch (const std::filesystem::filesystem_error &e)
+				{
 					errors.push_back("Error deleting file '" + filepath + "': " + e.what());
 				}
-			}			
+			}
 		}
 	}
 
@@ -773,12 +806,18 @@ void PluginJsHandler::JS_DROP_FOLDER(const Json &params, std::string &out_jsonRe
 	std::filesystem::path normalizedPath = fullPath.lexically_normal();
 
 	// Check if filepath contains relative components that move outside the downloads directory
-	if (normalizedPath.string().find(downloadsDir.string()) != 0) {
+	if (normalizedPath.string().find(downloadsDir.string()) != 0)
+	{
 		out_jsonReturn = Json(Json::object({{"error", "Invalid path: " + filepath}})).dump();
-	} else {
-		try {
+	}
+	else
+	{
+		try
+		{
 			std::filesystem::remove_all(normalizedPath);
-		} catch (const std::filesystem::filesystem_error &e) {
+		}
+		catch (const std::filesystem::filesystem_error &e)
+		{
 			out_jsonReturn = Json(Json::object({{"error", "Failed to delete '" + filepath + "': " + e.what()}})).dump();
 		}
 	}
@@ -789,12 +828,15 @@ void PluginJsHandler::JS_QUERY_DOWNLOADS_FOLDER(const Json &params, std::string 
 	std::string downloadsFolderFullPath = getDownloadsDir();
 	std::vector<Json> pathsList;
 
-	try {
+	try
+	{
 		for (const auto &entry : std::filesystem::directory_iterator(downloadsFolderFullPath))
 			pathsList.push_back(entry.path().string());
-	
+
 		out_jsonReturn = Json(Json::array(pathsList)).dump();
-	} catch (const std::filesystem::filesystem_error &e) {
+	}
+	catch (const std::filesystem::filesystem_error &e)
+	{
 		out_jsonReturn = Json(Json::object({{"error", "Failed to query downloads folder: " + std::string(e.what())}})).dump();
 	}
 }
@@ -816,7 +858,8 @@ void PluginJsHandler::JS_OBS_SOURCE_CREATE(const Json &params, std::string &out_
 			//	see "bool AddNew(QWidget *parent, const char *id, const char *name," in obs gui code
 			OBSSourceAutoRelease existingSource = obs_get_source_by_name(name.c_str());
 
-			if (existingSource != nullptr) {
+			if (existingSource != nullptr)
+			{
 				out_jsonReturn = Json(Json::object({{"error", "name already exists, " + name}})).dump();
 				return;
 			}
@@ -827,20 +870,20 @@ void PluginJsHandler::JS_OBS_SOURCE_CREATE(const Json &params, std::string &out_
 			obs_data_release(hotkeys);
 			obs_data_release(settings);
 
-			obs_source_t* source = obs_source_create(id.c_str(), name.c_str(), settings, hotkeys);
+			obs_source_t *source = obs_source_create(id.c_str(), name.c_str(), settings, hotkeys);
 
-			if (!source) {
+			if (!source)
+			{
 				out_jsonReturn = Json(Json::object({{"error", "obs_source_create returned null"}})).dump();
 				return;
 			}
 
 			obs_data_t *settingsSource = obs_source_get_settings(source);
 
-			Json jsonReturnValue = Json::object(
-				{{"settings", Json(obs_data_get_json(settingsSource))},
-				 {"audio_mixers", Json(std::to_string(obs_source_get_audio_mixers(source)))},
-				 {"deinterlace_mode", Json(std::to_string(obs_source_get_deinterlace_mode(source)))},
-				 {"deinterlace_field_order", Json(std::to_string(obs_source_get_deinterlace_field_order(source)))}});
+			Json jsonReturnValue = Json::object({{"settings", Json(obs_data_get_json(settingsSource))},
+							     {"audio_mixers", Json(std::to_string(obs_source_get_audio_mixers(source)))},
+							     {"deinterlace_mode", Json(std::to_string(obs_source_get_deinterlace_mode(source)))},
+							     {"deinterlace_field_order", Json(std::to_string(obs_source_get_deinterlace_field_order(source)))}});
 
 			out_jsonReturn = jsonReturnValue.dump();
 			obs_data_release(settingsSource);
@@ -856,28 +899,32 @@ void PluginJsHandler::JS_OBS_SOURCE_DESTROY(const Json &params, std::string &out
 	QMetaObject::invokeMethod(
 		mainWindow,
 		[mainWindow, this, params, &out_jsonReturn]() {
-
 			const auto &name = params["param2"].string_value();
-			
+
 			OBSSourceAutoRelease src = obs_get_source_by_name(name.c_str());
-			
+
 			auto itr = m_sources.find(name);
-			
+
 			if (itr != m_sources.end())
 				m_sources.erase(itr);
-			
-			if (src == nullptr) {
+
+			if (src == nullptr)
+			{
 				out_jsonReturn = Json(Json::object({{"error", "Can't find source with name " + name}})).dump();
 				return;
 			}
-			
-			if (obs_source_get_type(src) == OBS_SOURCE_TYPE_TRANSITION) {
+
+			if (obs_source_get_type(src) == OBS_SOURCE_TYPE_TRANSITION)
+			{
 				obs_source_release(src);
-			} else if (obs_source_get_type(src) == OBS_SOURCE_TYPE_SCENE) {
+			}
+			else if (obs_source_get_type(src) == OBS_SOURCE_TYPE_SCENE)
+			{
 				blog(LOG_INFO, "Releasing scene %s", obs_source_get_name(src));
 				std::list<obs_sceneitem_t *> items;
 				auto cb = [](obs_scene_t *scene, obs_sceneitem_t *item, void *data) {
-					if (item) {
+					if (item)
+					{
 						std::list<obs_sceneitem_t *> *items = reinterpret_cast<std::list<obs_sceneitem_t *> *>(data);
 						obs_sceneitem_addref(item);
 						items->push_back(item);
@@ -887,17 +934,115 @@ void PluginJsHandler::JS_OBS_SOURCE_DESTROY(const Json &params, std::string &out
 				obs_scene_t *scene = obs_scene_from_source(src);
 				if (scene)
 					obs_scene_enum_items(scene, cb, &items);
-			
-				for (auto item : items) {
+
+				for (auto item : items)
+				{
 					obs_sceneitem_remove(item);
 					obs_sceneitem_release(item);
 				}
-			
+
 				obs_source_release(src);
-			} else {
+			}
+			else
+			{
 				obs_source_remove(src);
-			}			
+			}
 		},
 		Qt::BlockingQueuedConnection);
 }
 
+/***
+* Save/Load
+**/
+
+// Handle the close event here before Qt sees it
+LRESULT CALLBACK HandleWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+	if (uMsg == WM_CLOSE)
+	{
+		PluginJsHandler::instance().saveSlabsBrowserDocks();
+	}
+
+	// Allow Qt to process the message as well
+	WNDPROC origWndProc = (WNDPROC)GetWindowLongPtr(hwnd, GWLP_USERDATA);
+	return CallWindowProc(origWndProc, hwnd, uMsg, wParam, lParam);
+}
+
+void PluginJsHandler::saveSlabsBrowserDocks()
+{
+	Json::array jarray;
+	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
+	QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
+
+	foreach(QDockWidget * dock, docks)
+	{
+		if (dock->property("isSlabs").isValid())
+		{
+			QCefWidgetInternal *widget = (QCefWidgetInternal *)dock->widget();
+
+			std::string url;
+
+			if (widget->cefBrowser != nullptr)
+				url = widget->cefBrowser->GetMainFrame()->GetURL();
+
+			Json::object obj{
+				{"title", dock->windowTitle().toStdString()},
+				{"url", url},
+				{"objectName", dock->objectName().toStdString()},
+			};
+
+			jarray.push_back(obj);
+		}
+	}
+
+	std::string output = Json(jarray).dump();
+	config_set_string(obs_frontend_get_global_config(), "BasicWindow", "SlabsBrowserDocks", output.c_str());
+}
+
+void PluginJsHandler::loadSlabsBrowserDocks()
+{
+	// This is to intercept the shutdown event so that we can save it before OBS does anything
+	QMainWindow *mainWindow = (QMainWindow *)obs_frontend_get_main_window();
+	WNDPROC origWndProc = (WNDPROC)SetWindowLongPtr(reinterpret_cast<HWND>(mainWindow->winId()), GWLP_WNDPROC, (LONG_PTR)HandleWndProc);
+	SetWindowLongPtr(reinterpret_cast<HWND>(mainWindow->winId()), GWLP_USERDATA, (LONG_PTR)origWndProc);
+
+	const char *jsonStr = config_get_string(obs_frontend_get_global_config(), "BasicWindow", "SlabsBrowserDocks");
+
+	std::string err;
+	Json json = Json::parse(jsonStr, err);
+
+	if (!err.empty())
+		return;
+
+	Json::array array = json.array_items();
+
+	for (Json &item : array)
+	{
+		std::string title = item["title"].string_value();
+		std::string url = item["url"].string_value();
+		std::string objectName = item["objectName"].string_value();
+
+		static QCef *qcef = obs_browser_init_panel();
+
+		obs_frontend_add_dock_by_id(objectName.c_str(), title.c_str(), nullptr);
+
+		// We have to go find the thing we just made... zzz...
+		QList<QDockWidget *> docks = mainWindow->findChildren<QDockWidget *>();
+		foreach(QDockWidget * dock, docks)
+		{
+			if (dock->objectName().toStdString() == objectName)
+			{
+
+				QCefWidget *browser = qcef->create_widget(dock, url, nullptr);
+				dock->setProperty("isSlabs", true);
+				dock->setObjectName(objectName.c_str());
+				dock->resize(460, 600);
+				dock->setMinimumSize(80, 80);
+				dock->setWindowTitle(title.c_str());
+				dock->setAllowedAreas(Qt::AllDockWidgetAreas);
+				dock->setWidget(browser);
+				break;
+			}
+		}
+	}
+}

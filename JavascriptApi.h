@@ -3,14 +3,13 @@
 #include <string>
 #include <map>
 
-#define SL_DOCK_PREFIX "sl_panel_"
-
 class JavascriptApi
 {
 public:
-	enum JSFuncs {
+	enum JSFuncs
+	{
 		JS_INVALID = 0,
-		JS_DOCK_EXECUTEJAVASCRIPT ,
+		JS_DOCK_EXECUTEJAVASCRIPT,
 		JS_DOCK_SETURL,
 		JS_QUERY_DOCKS,
 		JS_DOWNLOAD_ZIP,
@@ -24,35 +23,46 @@ public:
 		JS_DOCK_SWAP,
 		JS_DOCK_NEW_BROWSER_DOCK,
 		JS_GET_MAIN_WINDOW_GEOMETRY,
-		JS_TOGGLE_USER_INPUT
+		JS_TOGGLE_USER_INPUT,
+		JS_TOGGLE_DOCK_VISIBILITY,
+		JS_DESTROY_DOCK,
 	};
+
 public:
 	static std::map<std::string, JSFuncs> &getGlobalFunctionNames()
 	{
 		// None of the api function belows are blocking, they return immediatelly, but can accept a function as arg1 thats invoked when work is complete, which should allow await/promise structure
-		static std::map<std::string, JSFuncs> names =
-		{
+		static std::map<std::string, JSFuncs> names = {
 			/***
 			* Docks
 			*/
 
 			// .(@function(arg1))
-			// Docks with sl_uuid's are browser docks created by the plugin
-			//	Example arg1 = [{ "name": ".", "x": 0, "y": 0, "width": 0, "height": 0, "floating": bool, "sl_uuid": ".", "url": "." },]
+			//	Example arg1 = [{ "objectName": ".", "x": 0, "y": 0, "width": 0, "height": 0, "isSlabs": bool, "floating": bool, "url": "." },]
 			{"dock_queryAll", JS_QUERY_DOCKS},
 
-			// .(@sl_uuid, @url)
+			// .(@objectName, @url)
+			//	Only works on docks we've created
 			{"dock_setURL", JS_DOCK_SETURL},
 
-			// .(@sl_uuid, @jsString)
+			// .(@objectName, @jsString)
+			//	Only works on docks we've created
 			{"dock_executeJavascript", JS_DOCK_EXECUTEJAVASCRIPT},
 
-			// .(@title, @url, @sl_uuid)
-			//	Creates a new browser dock named sl_panel_{sl_uuid} (ie "sl_panel_19533") tha will appear in their list of docks but not as a "Browser Dock", even though it works identically as one
-			//		dockName is the unique identifer of the dock
+			// .(@objectName, @bool_visible)
+			//	Only works on docks we've created
+			{"dock_toggleBrowserDockVisibility", JS_TOGGLE_DOCK_VISIBILITY},
+
+			// .(@objectName)
+			//	Only works on docks we've created
+			{"dock_destroyBrowserDock", JS_DESTROY_DOCK},
+
+			// .(@title, @url, @objectName)
+			//	Creates a new browser dock, its guid is the 'objectName', title is what the user sees. Will appear in their list of docks but not as a "Browser Dock", even though it works identically as one
+			//		objectName is the unique identifer of the dock
 			{"dock_newBrowserDock", JS_DOCK_NEW_BROWSER_DOCK},
 
-			// .(@dockName, @int_areaMask, @int_newXSize_optional, @int_newYSize_optional)
+			// .(@objectName, @int_areaMask, @int_newXSize_optional, @int_newYSize_optional)
 			//	areaMask can be a combination of Left Right Top Bottom, ie (LeftDockWidgetArea | RightDockWidgetArea) or (TopDockWidgetArea | BottomDockWidgetArea)
 			//	These are the current values from Qt
 			//		LeftDockWidgetArea = 0x1,
@@ -61,10 +71,10 @@ public:
 			//		BottomDockWidgetArea = 0x8,
 			{"dock_setArea", JS_DOCK_SETAREA},
 
-			// .(@dockName1, @dockName2)
-			//	Swaps the the positions of dock1 with dock2 
+			// .(@objectName1, @objectName2)
+			//	Swaps the the positions of dock1 with dock2
 			{"dock_swap", JS_DOCK_SWAP},
-			
+
 			/***
 			* Qt Information
 			*/
@@ -128,20 +138,20 @@ public:
 		return names;
 	}
 
-	static bool isValidFunctionName(const std::string& str)
+	static bool isValidFunctionName(const std::string &str)
 	{
 		auto ref = getGlobalFunctionNames();
 		return ref.find(str) != ref.end();
 	}
 
-	static JSFuncs getFunctionId(const std::string& funcName)
+	static JSFuncs getFunctionId(const std::string &funcName)
 	{
 		auto ref = getGlobalFunctionNames();
 		auto itr = ref.find(funcName);
 
 		if (itr != ref.end())
 			return itr->second;
-		
+
 		return JS_INVALID;
 	}
 };

@@ -9,10 +9,8 @@
 
 typedef std::function<void(CefRefPtr<CefBrowser>)> BrowserFunc;
 
-class BrowserApp : public CefApp,
-		   public CefRenderProcessHandler,
-		   public CefBrowserProcessHandler,
-		   public CefV8Handler {
+class BrowserApp : public CefApp, public CefRenderProcessHandler, public CefBrowserProcessHandler, public CefV8Handler
+{
 
 	int m_callbackIdCounter = 0;
 	std::map<int, std::pair<CefRefPtr<CefV8Value>, CefRefPtr<CefV8Context>>> m_callbackMap;
@@ -26,18 +24,9 @@ public:
 	virtual void OnBeforeChildProcessLaunch(CefRefPtr<CefCommandLine> command_line) override;
 	virtual void OnRegisterCustomSchemes(CefRawPtr<CefSchemeRegistrar> registrar) override;
 	virtual void OnBeforeCommandLineProcessing(const CefString &process_type, CefRefPtr<CefCommandLine> command_line) override;
-	virtual void OnContextCreated(CefRefPtr<CefBrowser> browser,
-				      CefRefPtr<CefFrame> frame,
-				      CefRefPtr<CefV8Context> context) override;
-	virtual bool OnProcessMessageReceived(CefRefPtr<CefBrowser> browser,
-				 CefRefPtr<CefFrame> frame,
-				 CefProcessId source_process,
-				 CefRefPtr<CefProcessMessage> message) override;
-	virtual bool Execute(const CefString &name,
-			     CefRefPtr<CefV8Value> object,
-			     const CefV8ValueList &arguments,
-			     CefRefPtr<CefV8Value> &retval,
-			     CefString &exception) override;
+	virtual void OnContextCreated(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefV8Context> context) override;
+	virtual bool OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefProcessId source_process, CefRefPtr<CefProcessMessage> message) override;
+	virtual bool Execute(const CefString &name, CefRefPtr<CefV8Value> object, const CefV8ValueList &arguments, CefRefPtr<CefV8Value> &retval, CefString &exception) override;
 
 	IMPLEMENT_REFCOUNTING(BrowserApp);
 };

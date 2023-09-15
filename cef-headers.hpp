@@ -31,7 +31,8 @@
 
 #define SendBrowserProcessMessage(browser, pid, msg)             \
 	CefRefPtr<CefFrame> mainFrame = browser->GetMainFrame(); \
-	if (mainFrame) {                                         \
+	if (mainFrame)                                           \
+	{                                                        \
 		mainFrame->SendProcessMessage(pid, msg);         \
 	}
 

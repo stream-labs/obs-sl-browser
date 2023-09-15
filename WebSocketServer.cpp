@@ -6,7 +6,8 @@ static int callback(lws *wsi, lws_callback_reasons reason, void *user, void *in,
 {
 	printf("callback %d\n", reason);
 
-	switch (reason) {
+	switch (reason)
+	{
 	case LWS_CALLBACK_ESTABLISHED:
 		printf("LWS_CALLBACK_ESTABLISHED\n");
 		break;
@@ -50,12 +51,13 @@ void WebSocketServer::workerThread()
 	// Server configuration
 	lws_context_creation_info info;
 	memset(&info, 0, sizeof(info));
-	info.port = 24231; 
+	info.port = 24231;
 	info.protocols = protocols;
 
 	// Create the server context
 	lws_context *context = lws_create_context(&info);
-	if (!context) {
+	if (!context)
+	{
 		printf("lws_create_context failed\n");
 		return;
 	}
@@ -63,7 +65,8 @@ void WebSocketServer::workerThread()
 	printf("WebSocketServer Working\n");
 
 	// Main server loop
-	while (m_started) {
+	while (m_started)
+	{
 		lws_service(context, 1000);
 	}
 

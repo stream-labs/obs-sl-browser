@@ -11,8 +11,7 @@
 
 class grpc_plugin_objImpl final : public grpc_plugin_obj::Service
 {
-	grpc::Status com_grpc_js_api(grpc::ServerContext *context, const grpc_js_api_Request *request,
-				     grpc_js_api_Reply *response) override
+	grpc::Status com_grpc_js_api(grpc::ServerContext *context, const grpc_js_api_Request *request, grpc_js_api_Reply *response) override
 	{
 		PluginJsHandler::instance().pushApiRequest(request->funcname(), request->params());
 		return grpc::Status::OK;
@@ -24,8 +23,7 @@ class grpc_plugin_objImpl final : public grpc_plugin_obj::Service
 * Sending messages to the proxy
 */
 
-grpc_plugin_objClient::grpc_plugin_objClient(std::shared_ptr<grpc::Channel> channel) :
-	stub_(grpc_proxy_obj::NewStub(channel))
+grpc_plugin_objClient::grpc_plugin_objClient(std::shared_ptr<grpc::Channel> channel) : stub_(grpc_proxy_obj::NewStub(channel))
 {
 	m_connected = channel->WaitForConnected(std::chrono::system_clock::now() + std::chrono::seconds(3));
 }
@@ -49,14 +47,9 @@ bool grpc_plugin_objClient::send_executeCallback(const int functionId, const std
 // Grpc
 //
 
+GrpcPlugin::GrpcPlugin() {}
 
-GrpcPlugin::GrpcPlugin() {
-
-}
-
-GrpcPlugin::~GrpcPlugin() {
-
-}
+GrpcPlugin::~GrpcPlugin() {}
 
 bool GrpcPlugin::startServer(int32_t listenPort)
 {
@@ -82,8 +75,7 @@ bool GrpcPlugin::startServer(int32_t listenPort)
 
 bool GrpcPlugin::connectToClient(int32_t portNumber)
 {
-	m_clientObj = std::make_unique<grpc_plugin_objClient>(
-		grpc::CreateChannel("localhost:" + std::to_string(portNumber), grpc::InsecureChannelCredentials()));
+	m_clientObj = std::make_unique<grpc_plugin_objClient>(grpc::CreateChannel("localhost:" + std::to_string(portNumber), grpc::InsecureChannelCredentials()));
 
 	return m_clientObj != nullptr;
 }

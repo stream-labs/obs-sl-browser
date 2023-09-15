@@ -8,14 +8,14 @@ public:
 	void start();
 	void stop();
 
-	static WebSocketServer& instance()
+	static WebSocketServer &instance()
 	{
 		static WebSocketServer ws;
 		return ws;
 	}
 
 private:
-	WebSocketServer(){}
+	WebSocketServer() {}
 
 	void workerThread();
 

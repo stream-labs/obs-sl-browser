@@ -13,14 +13,15 @@ class grpc_plugin_objClient
 public:
 	grpc_plugin_objClient(std::shared_ptr<grpc::Channel> channel);
 
-	bool send_executeCallback(const int functionId, const std::string& jsonStr);
+	bool send_executeCallback(const int functionId, const std::string &jsonStr);
 
 private:
 	std::atomic<bool> m_connected{false};
 	std::unique_ptr<grpc_proxy_obj::Stub> stub_;
 };
 
-class GrpcPlugin {
+class GrpcPlugin
+{
 public:
 	static GrpcPlugin &instance()
 	{

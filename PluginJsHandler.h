@@ -14,9 +14,11 @@ public:
 	void stop();
 	void pushApiRequest(const std::string &funcName, const std::string &params);
 	void executeApiRequest(const std::string &funcName, const std::string &params);
+	void loadSlabsBrowserDocks();
+	void saveSlabsBrowserDocks();
 
 public:
-	static PluginJsHandler& instance()
+	static PluginJsHandler &instance()
 	{
 		static PluginJsHandler a;
 		return a;
@@ -24,8 +26,6 @@ public:
 
 private:
 	void workerThread();
-	void loadSlabsBrowserDocks();
-	void saveSlabsBrowserDocks();
 
 	void JS_QUERY_DOCKS(const json11::Json &params, std::string &out_jsonReturn);
 	void JS_DOCK_EXECUTEJAVASCRIPT(const json11::Json &params, std::string &out_jsonReturn);
@@ -41,7 +41,9 @@ private:
 	void JS_DOCK_NEW_BROWSER_DOCK(const json11::Json &params, std::string &out_jsonReturn);
 	void JS_GET_MAIN_WINDOW_GEOMETRY(const json11::Json &params, std::string &out_jsonReturn);
 	void JS_TOGGLE_USER_INPUT(const json11::Json &params, std::string &out_jsonReturn);
-	
+	void JS_TOGGLE_DOCK_VISIBILITY(const json11::Json &params, std::string &out_jsonReturn);
+	void JS_DESTROY_DOCK(const json11::Json &params, std::string &out_jsonReturn);
+
 	std::string getDownloadsDir() const;
 
 	std::mutex m_queueMtx;
@@ -49,5 +51,5 @@ private:
 	std::vector<std::pair<std::string, std::string>> m_queudRequests;
 	std::thread m_workerThread;
 
-	std::map<std::string, obs_source_t*> m_sources;
+	std::map<std::string, obs_source_t *> m_sources;
 };

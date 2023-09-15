@@ -49,41 +49,29 @@ CefRefPtr<CefRequestHandler> BrowserClient::GetRequestHandler()
 	return this;
 }
 
-CefRefPtr<CefResourceRequestHandler> BrowserClient::GetResourceRequestHandler(
-	CefRefPtr<CefBrowser>, CefRefPtr<CefFrame>,
-	CefRefPtr<CefRequest> request, bool, bool, const CefString &, bool &)
+CefRefPtr<CefResourceRequestHandler> BrowserClient::GetResourceRequestHandler(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame>, CefRefPtr<CefRequest> request, bool, bool, const CefString &, bool &)
 {
-	if (request->GetHeaderByName("origin") == "null") {
+	if (request->GetHeaderByName("origin") == "null")
+	{
 		return this;
 	}
 
 	return nullptr;
 }
 
-CefResourceRequestHandler::ReturnValue
-BrowserClient::OnBeforeResourceLoad(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame>,
-				    CefRefPtr<CefRequest>,
-				    CefRefPtr<CefCallback>)
+CefResourceRequestHandler::ReturnValue BrowserClient::OnBeforeResourceLoad(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame>, CefRefPtr<CefRequest>, CefRefPtr<CefCallback>)
 {
 	return RV_CONTINUE;
 }
 #endif
 
-bool BrowserClient::OnBeforePopup(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame>,
-				  const CefString &, const CefString &,
-				  cef_window_open_disposition_t, bool,
-				  const CefPopupFeatures &, CefWindowInfo &,
-				  CefRefPtr<CefClient> &, CefBrowserSettings &,
-				  CefRefPtr<CefDictionaryValue> &, bool *)
+bool BrowserClient::OnBeforePopup(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame>, const CefString &, const CefString &, cef_window_open_disposition_t, bool, const CefPopupFeatures &, CefWindowInfo &, CefRefPtr<CefClient> &, CefBrowserSettings &, CefRefPtr<CefDictionaryValue> &, bool *)
 {
 	/* block popups */
 	return true;
 }
 
-void BrowserClient::OnBeforeContextMenu(CefRefPtr<CefBrowser>,
-					CefRefPtr<CefFrame>,
-					CefRefPtr<CefContextMenuParams>,
-					CefRefPtr<CefMenuModel> model)
+void BrowserClient::OnBeforeContextMenu(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame>, CefRefPtr<CefContextMenuParams>, CefRefPtr<CefMenuModel> model)
 {
 	/* remove all context menu contributions */
 	model->Clear();
@@ -92,7 +80,8 @@ void BrowserClient::OnBeforeContextMenu(CefRefPtr<CefBrowser>,
 /*static*/
 json11::Json convertCefValueToJSON(CefRefPtr<CefValue> value)
 {
-	switch (value->GetType()) {
+	switch (value->GetType())
+	{
 	case VTYPE_NULL:
 		return nullptr;
 
@@ -111,7 +100,8 @@ json11::Json convertCefValueToJSON(CefRefPtr<CefValue> value)
 	case VTYPE_LIST: {
 		const auto &list = value->GetList();
 		std::vector<json11::Json> jsonList;
-		for (size_t i = 0; i < list->GetSize(); ++i) {
+		for (size_t i = 0; i < list->GetSize(); ++i)
+		{
 			jsonList.push_back(convertCefValueToJSON(list->GetValue(i)));
 		}
 		return jsonList;
@@ -122,7 +112,8 @@ json11::Json convertCefValueToJSON(CefRefPtr<CefValue> value)
 		std::map<std::string, json11::Json> jsonMap;
 		CefDictionaryValue::KeyList keys;
 		dict->GetKeys(keys);
-		for (const auto &key : keys) {
+		for (const auto &key : keys)
+		{
 			jsonMap[key] = convertCefValueToJSON(dict->GetValue(key));
 		}
 		return jsonMap;
@@ -137,7 +128,8 @@ json11::Json convertCefValueToJSON(CefRefPtr<CefValue> value)
 std::string BrowserClient::cefListValueToJSONString(CefRefPtr<CefListValue> listValue)
 {
 	std::map<std::string, json11::Json> jsonMap;
-	for (size_t i = 0; i < listValue->GetSize(); ++i) {
+	for (size_t i = 0; i < listValue->GetSize(); ++i)
+	{
 		// Convert index to string key like "param1", "param2", ...
 		std::string key = "param" + std::to_string(i + 1);
 		jsonMap[key] = convertCefValueToJSON(listValue->GetValue(i));
@@ -170,12 +162,11 @@ CefRefPtr<CefBrowser> BrowserClient::PopCallback(const int functionId)
 	return nullptr;
 }
 
-bool BrowserClient::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame>, CefProcessId processId,
-	CefRefPtr<CefProcessMessage> message)
+bool BrowserClient::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame>, CefProcessId processId, CefRefPtr<CefProcessMessage> message)
 {
 	const std::string &name = message->GetName();
 	CefRefPtr<CefListValue> input_args = message->GetArgumentList();
-	
+
 	if (!valid())
 		return false;
 
@@ -193,7 +184,8 @@ bool BrowserClient::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefR
 
 void BrowserClient::GetViewRect(CefRefPtr<CefBrowser>, CefRect &rect)
 {
-	if (!valid()) {
+	if (!valid())
+	{
 		rect.Set(0, 0, 16, 16);
 		return;
 	}
@@ -204,30 +196,25 @@ void BrowserClient::GetViewRect(CefRefPtr<CefBrowser>, CefRect &rect)
 bool BrowserClient::OnTooltip(CefRefPtr<CefBrowser>, CefString &text)
 {
 	std::string str_text = text;
-	QMetaObject::invokeMethod(
-		QCoreApplication::instance()->thread(), [str_text]() {
-			QToolTip::showText(QCursor::pos(), str_text.c_str());
-		});
+	QMetaObject::invokeMethod(QCoreApplication::instance()->thread(), [str_text]() { QToolTip::showText(QCursor::pos(), str_text.c_str()); });
 	return true;
 }
 
-void BrowserClient::OnPaint(CefRefPtr<CefBrowser>, PaintElementType type,
-			    const RectList &, const void *buffer, int width,
-			    int height)
+void BrowserClient::OnPaint(CefRefPtr<CefBrowser>, PaintElementType type, const RectList &, const void *buffer, int width, int height)
 {
-	if (type != PET_VIEW) {
+	if (type != PET_VIEW)
+	{
 		// TODO Overlay texture on top of bs->texture
 		return;
 	}
 
-	if (!valid()) {
+	if (!valid())
+	{
 		return;
 	}
 }
 
-void BrowserClient::OnAudioStreamStarted(CefRefPtr<CefBrowser> browser,
-					 const CefAudioParameters &params_,
-					 int channels_)
+void BrowserClient::OnAudioStreamStarted(CefRefPtr<CefBrowser> browser, const CefAudioParameters &params_, int channels_)
 {
 	m_channels = channels_;
 	m_channel_layout = (ChannelLayout)params_.channel_layout;
@@ -235,29 +222,22 @@ void BrowserClient::OnAudioStreamStarted(CefRefPtr<CefBrowser> browser,
 	m_frames_per_buffer = params_.frames_per_buffer;
 }
 
-void BrowserClient::OnAudioStreamPacket(CefRefPtr<CefBrowser> browser,
-					const float **data, int frames,
-					int64_t pts)
+void BrowserClient::OnAudioStreamPacket(CefRefPtr<CefBrowser> browser, const float **data, int frames, int64_t pts)
 {
-	if (!valid()) {
+	if (!valid())
+	{
 		return;
 	}
 }
 
-void BrowserClient::OnAudioStreamStopped(CefRefPtr<CefBrowser> browser)
-{
+void BrowserClient::OnAudioStreamStopped(CefRefPtr<CefBrowser> browser) {}
 
-}
-
-void BrowserClient::OnAudioStreamError(CefRefPtr<CefBrowser> browser,
-				       const CefString &message)
-{
-
-}
+void BrowserClient::OnAudioStreamError(CefRefPtr<CefBrowser> browser, const CefString &message) {}
 
 static CefAudioHandler::ChannelLayout Convert2CEFSpeakerLayout(int channels)
 {
-	switch (channels) {
+	switch (channels)
+	{
 	case 1:
 		return CEF_CHANNEL_LAYOUT_MONO;
 	case 2:
@@ -277,8 +257,7 @@ static CefAudioHandler::ChannelLayout Convert2CEFSpeakerLayout(int channels)
 	}
 }
 
-bool BrowserClient::GetAudioParameters(CefRefPtr<CefBrowser> browser,
-				       CefAudioParameters &params)
+bool BrowserClient::GetAudioParameters(CefRefPtr<CefBrowser> browser, CefAudioParameters &params)
 {
 	int channels = 2;
 	params.channel_layout = CEF_CHANNEL_LAYOUT_MONO;
@@ -289,18 +268,16 @@ bool BrowserClient::GetAudioParameters(CefRefPtr<CefBrowser> browser,
 
 void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, int)
 {
-	if (!valid()) {
+	if (!valid())
+	{
 		return;
 	}
 
-	if (frame->IsMain()) {
-	}
+	if (frame->IsMain())
+	{}
 }
 
-bool BrowserClient::OnConsoleMessage(CefRefPtr<CefBrowser>,
-				     cef_log_severity_t level,
-				     const CefString &message,
-				     const CefString &source, int line)
+bool BrowserClient::OnConsoleMessage(CefRefPtr<CefBrowser>, cef_log_severity_t level, const CefString &message, const CefString &source, int line)
 {
 	return false;
 }

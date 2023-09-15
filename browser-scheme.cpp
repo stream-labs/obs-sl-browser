@@ -3,10 +3,7 @@
 #include <include/wrapper/cef_stream_resource_handler.h>
 
 #if !ENABLE_LOCAL_FILE_URL_SCHEME
-CefRefPtr<CefResourceHandler>
-BrowserSchemeHandlerFactory::Create(CefRefPtr<CefBrowser> browser,
-				    CefRefPtr<CefFrame>, const CefString &,
-				    CefRefPtr<CefRequest> request)
+CefRefPtr<CefResourceHandler> BrowserSchemeHandlerFactory::Create(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame>, const CefString &, CefRefPtr<CefRequest> request)
 {
 	if (!browser || !request)
 		return nullptr;
@@ -17,10 +14,7 @@ BrowserSchemeHandlerFactory::Create(CefRefPtr<CefBrowser> browser,
 	std::string path = CefString(&parts.path);
 
 	path = CefURIDecode(path, true, cef_uri_unescape_rule_t::UU_SPACES);
-	path = CefURIDecode(
-		path, true,
-		cef_uri_unescape_rule_t::
-			UU_URL_SPECIAL_CHARS_EXCEPT_PATH_SEPARATORS);
+	path = CefURIDecode(path, true, cef_uri_unescape_rule_t::UU_URL_SPECIAL_CHARS_EXCEPT_PATH_SEPARATORS);
 
 	std::string fileExtension = path.substr(path.find_last_of(".") + 1);
 
@@ -30,19 +24,20 @@ BrowserSchemeHandlerFactory::Create(CefRefPtr<CefBrowser> browser,
 		fileExtension = "woff";
 
 #ifdef _WIN32
-	CefRefPtr<CefStreamReader> stream =
-		CefStreamReader::CreateForFile(path.substr(1));
+	CefRefPtr<CefStreamReader> stream = CefStreamReader::CreateForFile(path.substr(1));
 #else
-	CefRefPtr<CefStreamReader> stream =
-		CefStreamReader::CreateForFile(path);
+	CefRefPtr<CefStreamReader> stream = CefStreamReader::CreateForFile(path);
 #endif
 
-	if (stream) {
+	if (stream)
+	{
 		CefString mimeType = CefGetMimeType(fileExtension);
 		if (mimeType.empty())
 			mimeType = "application/octet-stream";
 		return new CefStreamResourceHandler(mimeType, stream);
-	} else {
+	}
+	else
+	{
 		return nullptr;
 	}
 }

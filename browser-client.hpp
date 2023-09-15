@@ -7,20 +7,11 @@
 
 struct BrowserSource;
 
-class BrowserClient : public CefClient,
-		      public CefDisplayHandler,
-		      public CefLifeSpanHandler,
-		      public CefRequestHandler,
-		      public CefResourceRequestHandler,
-		      public CefContextMenuHandler,
-		      public CefRenderHandler,
-		      public CefAudioHandler,
-		      public CefLoadHandler {
+class BrowserClient : public CefClient, public CefDisplayHandler, public CefLifeSpanHandler, public CefRequestHandler, public CefResourceRequestHandler, public CefContextMenuHandler, public CefRenderHandler, public CefAudioHandler, public CefLoadHandler
+{
 
 public:
-	inline BrowserClient(bool reroute_audio_) :
-		m_reroute_audio(reroute_audio_)
-	{}
+	inline BrowserClient(bool reroute_audio_) : m_reroute_audio(reroute_audio_) {}
 
 	/* CefClient */
 	CefRefPtr<CefLoadHandler> GetLoadHandler() override;
@@ -36,22 +27,14 @@ public:
 	bool OnConsoleMessage(CefRefPtr<CefBrowser> browser, cef_log_severity_t level, const CefString &message, const CefString &source, int line) override;
 
 	/* CefLifeSpanHandler */
-	bool OnBeforePopup(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame,
-		      const CefString &target_url,
-		      const CefString &target_frame_name,
-		      cef_window_open_disposition_t target_disposition,
-		      bool user_gesture, const CefPopupFeatures &popupFeatures,
-		      CefWindowInfo &windowInfo, CefRefPtr<CefClient> &client,
-		      CefBrowserSettings &settings,
-		      CefRefPtr<CefDictionaryValue> &extra_info,
-		      bool *no_javascript_access) override;
+	bool OnBeforePopup(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, const CefString &target_url, const CefString &target_frame_name, cef_window_open_disposition_t target_disposition, bool user_gesture, const CefPopupFeatures &popupFeatures, CefWindowInfo &windowInfo,
+			   CefRefPtr<CefClient> &client, CefBrowserSettings &settings, CefRefPtr<CefDictionaryValue> &extra_info, bool *no_javascript_access) override;
 
 	bool OnTooltip(CefRefPtr<CefBrowser> browser, CefString &text) override;
-	bool OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefProcessId source_process,
-				      CefRefPtr<CefProcessMessage> message) override;
+	bool OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefProcessId source_process, CefRefPtr<CefProcessMessage> message) override;
 
 	/* CefRequestHandler */
-	CefRefPtr<CefResourceRequestHandler> GetResourceRequestHandler( CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefRequest> request, bool is_navigation, bool is_download, const CefString &request_initiator, bool &disable_default_handling) override;
+	CefRefPtr<CefResourceRequestHandler> GetResourceRequestHandler(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefRequest> request, bool is_navigation, bool is_download, const CefString &request_initiator, bool &disable_default_handling) override;
 
 	/* CefResourceRequestHandler */
 	CefResourceRequestHandler::ReturnValue OnBeforeResourceLoad(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefRequest> request, CefRefPtr<CefCallback> callback) override;
@@ -72,7 +55,7 @@ public:
 	virtual bool GetAudioParameters(CefRefPtr<CefBrowser> browser, CefAudioParameters &params) override;
 
 	/* CefLoadHandler */
-	void OnLoadEnd(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, int httpStatusCode) override;		
+	void OnLoadEnd(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, int httpStatusCode) override;
 
 	int m_channels = 0;
 	int m_sample_rate = 0;

@@ -8,19 +8,21 @@
 #include <grpcpp/grpcpp.h>
 #include <grpcpp/health_check_service_interface.h>
 
-class grpc_proxy_objClient {
+class grpc_proxy_objClient
+{
 public:
 	grpc_proxy_objClient(std::shared_ptr<grpc::Channel> channel);
 
-	bool send_js_api(const std::string& funcName, const std::string& params);
-	
+	bool send_js_api(const std::string &funcName, const std::string &params);
+
 	std::atomic<bool> m_connected{false};
 
 private:
 	std::unique_ptr<grpc_plugin_obj::Stub> stub_;
 };
 
-class GrpcBrowser {
+class GrpcBrowser
+{
 public:
 	static GrpcBrowser &instance()
 	{
@@ -34,7 +36,6 @@ public:
 	void stop();
 
 	auto *getClient() { return m_clientObj.get(); }
-
 
 private:
 	GrpcBrowser();

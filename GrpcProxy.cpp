@@ -8,22 +8,23 @@
 * Receiving messages from the plugin
 */
 
-class grpc_proxy_objImpl final : public grpc_proxy_obj::Service {
-	grpc::Status com_grpc_js_executeCallback(grpc::ServerContext *context, const grpc_js_api_ExecuteCallback *request,
-						 grpc_js_api_Reply *response) override
+class grpc_proxy_objImpl final : public grpc_proxy_obj::Service
+{
+	grpc::Status com_grpc_js_executeCallback(grpc::ServerContext *context, const grpc_js_api_ExecuteCallback *request, grpc_js_api_Reply *response) override
 	{
 		CefRefPtr<CefProcessMessage> msg = CefProcessMessage::Create("executeCallback");
 		CefRefPtr<CefListValue> execute_args = msg->GetArgumentList();
 		execute_args->SetInt(0, request->funcid());
 		execute_args->SetString(1, request->jsonstr());
 
-		if (auto ptr = browserClient->PopCallback(request->funcid())) {
+		if (auto ptr = browserClient->PopCallback(request->funcid()))
+		{
 			SendBrowserProcessMessage(ptr, PID_RENDERER, msg);
 		}
-		else {
+		else
+		{
 			printf("com_grpc_js_executeCallback failed to find browser for function");
 		}
-			
 
 		return grpc::Status::OK;
 	}
@@ -34,8 +35,7 @@ class grpc_proxy_objImpl final : public grpc_proxy_obj::Service {
 * Sending messages to the plugin
 */
 
-grpc_proxy_objClient::grpc_proxy_objClient(std::shared_ptr<grpc::Channel> channel) :
-	stub_(grpc_plugin_obj::NewStub(channel))
+grpc_proxy_objClient::grpc_proxy_objClient(std::shared_ptr<grpc::Channel> channel) : stub_(grpc_plugin_obj::NewStub(channel))
 {
 	m_connected = channel->WaitForConnected(std::chrono::system_clock::now() + std::chrono::seconds(3));
 }
@@ -59,13 +59,9 @@ bool grpc_proxy_objClient::send_js_api(const std::string &funcName, const std::s
 // Grpc
 //
 
-GrpcBrowser::GrpcBrowser() {
+GrpcBrowser::GrpcBrowser() {}
 
-}
-
-GrpcBrowser::~GrpcBrowser() {
-
-}
+GrpcBrowser::~GrpcBrowser() {}
 
 bool GrpcBrowser::startServer(int32_t listenPort)
 {
@@ -91,12 +87,9 @@ bool GrpcBrowser::startServer(int32_t listenPort)
 
 bool GrpcBrowser::connectToClient(int32_t portNumber)
 {
-	m_clientObj = std::make_unique<grpc_proxy_objClient>(
-		grpc::CreateChannel("localhost:" + std::to_string(portNumber), grpc::InsecureChannelCredentials()));
+	m_clientObj = std::make_unique<grpc_proxy_objClient>(grpc::CreateChannel("localhost:" + std::to_string(portNumber), grpc::InsecureChannelCredentials()));
 
 	return m_clientObj != nullptr;
 }
 
-void GrpcBrowser::stop() {
-
-}
+void GrpcBrowser::stop() {}

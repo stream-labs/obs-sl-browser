@@ -33,15 +33,9 @@
 using namespace std;
 using namespace json11;
 
-SlBrowser::SlBrowser()
-{
+SlBrowser::SlBrowser() {}
 
-}
-
-SlBrowser::~SlBrowser()
-{
-
-}
+SlBrowser::~SlBrowser() {}
 
 void SlBrowser::run(int argc, char *argv[])
 {
